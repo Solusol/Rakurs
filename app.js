@@ -1825,7 +1825,7 @@ function lookDialog(opts){
   const name = opts.mode==='edit' ? CUR_PROJ.name : (opts.mode==='first' ? '' : '');
   const m=document.createElement('div'); m.className='modal look'; m.id='lookModal';
   m.innerHTML=`<div class="dlgbox">
-    <div class="dlgbox-head"><h3>${opts.mode==='edit'?'Редактировать историю':'Добавить историю'}</h3><button class="icon-btn" data-close>✕</button></div>
+    <div class="dlgbox-head"><h3>${opts.mode==='edit'?'Редактировать историю':'Новая история'}</h3><button class="icon-btn" data-close>✕</button></div>
     <form class="dlgbox-body" id="lookForm">
       <div class="field"><label for="lookName">Название</label><input type="text" id="lookName" autocomplete="off" maxlength="80" placeholder="" value="${esc(name)}"></div>
       <div class="field"><label>Цветовая палитра</label><div class="tiles">${PALETTES.map(p=>`<label class="tile"><input type="radio" name="palette" value="${p.id}"${p.id===cur.palette?' checked':''}><span class="sw">${p.c.map(c=>`<i style="background:${c}"></i>`).join('')}</span><span>${p.label}</span></label>`).join('')}</div></div>
@@ -1849,8 +1849,8 @@ function lookDialog(opts){
 function renderBrand(){ if(!CUR_PROJ.builtin||PROJ.setup) document.title=CUR_PROJ.name+' · Ракурс'; }
 function needsStart(){ return CUR_PROJ.builtin && !PROJ.setup && PROJ.list.length===1 && !C.sections.some(s=>(s.pages||[]).some(p=>!p.special)) && isEmptyData(D); }
 function showStart(){
-  const st=document.createElement('div'); st.className='start'; st.id='startScreen';
-  const LOGOS=window.LIMB_LOGOS||{}; st.innerHTML=`<div class="start-brand"><img class="logo" src="${LOGOS[(CUR_PROJ.look&&CUR_PROJ.look.palette)]||LOGOS.base||window.LIMB_LOGO||'assets/logo.svg'}" alt=""><h1>${esc(APP_NAME)}</h1></div><p class="sub">Рабочее пространство для твоей истории</p><button class="btn primary" id="startCreate">Начать</button>`;
+  const st=document.createElement('div'); st.className='start rk-start-cover'; st.id='startScreen';
+  st.innerHTML=`<div class="rk-start-film"><img class="rk-start-bg" src="assets/backgrounds/main.png" alt="Ракурс — пространство для твоих историй" draggable="false"><button type="button" class="rk-start-btn" id="startCreate" aria-label="Открыть"><img class="rk-start-btn-img" src="assets/buttons/open.png" alt="Открыть" draggable="false"><img class="rk-start-btn-img-hover" src="assets/buttons/open-hover.png" alt="" aria-hidden="true" draggable="false"></button></div>`;
   document.body.appendChild(st); document.body.classList.add('has-start');
   $('#startCreate', st).onclick=()=>lookDialog({mode:'first', onDone:(l,nm)=>{ CUR_PROJ.name=nm; CUR_PROJ.look=l; PROJ.setup=true; saveProjects(PROJ); prefs.font=l.font; savePrefs(); st.remove(); document.body.classList.remove('has-start'); location.hash='#/'; location.reload(); }});
 }
