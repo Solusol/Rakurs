@@ -2594,8 +2594,16 @@ function rkCharacterDesigner(host,p,data){
  types.forEach(([t,label])=>{const b=document.createElement('button');b.type='button';b.textContent=label;b.dataset.addType=t;b.onclick=()=>add(t);menu.appendChild(b);});
  const hint=document.createElement('div');hint.className='cc-hint';const text=document.createElement('span');text.textContent='Добавить нужные блоки';hint.append(text,icon('close','Закрыть подсказку',()=>change(()=>model.introDismissed=true,true)));
  tools.append(addButton,undo,redo,grid,menu,hint);const sizer=document.createElement('div');sizer.className='cc-sizer';const stage=document.createElement('div');stage.className='cc-stage';stage.setAttribute('aria-label',isLocation?'Страница локации':'Страница персонажа');sizer.appendChild(stage);root.append(tools,sizer);
- function fit(){scale=Math.min(1,(sizer.clientWidth||host.clientWidth||1000)/1000);const height=Math.max(680,...model.items.map(it=>it.y+it.h+60));stage.style.height=height+'px';stage.style.transform='scale('+scale+')';sizer.style.height=Math.ceil(height*scale)+'px';}
+ /* Сетка в правке уходит вниз без ограничения: холст всегда длиннее видимой области и растёт при прокрутке */
+ const scroller=side?host.closest('#view2Body'):null;
+ const viewTop=()=>scroller?scroller.getBoundingClientRect().top:((document.querySelector('header.bar')||{getBoundingClientRect:()=>({bottom:0})}).getBoundingClientRect().bottom||0);
+ const viewBottom=()=>scroller?scroller.getBoundingClientRect().bottom:window.innerHeight;
+ let grown=0;
+ function fit(){scale=Math.min(1,(sizer.clientWidth||host.clientWidth||1000)/1000);let height=Math.max(680,...model.items.map(it=>it.y+it.h+60));
+  if(editable()&&sizer.isConnected){const r=sizer.getBoundingClientRect();const visible=Math.max(0,(viewBottom()-r.top)/scale);height=Math.max(height,Math.ceil(visible)+600,grown);grown=height;}else grown=0;
+  stage.style.height=height+'px';stage.style.transform='scale('+scale+')';sizer.style.height=Math.ceil(height*scale)+'px';}
  const observer=new ResizeObserver(fit);observer.observe(sizer);
+ {let raf=0;const onScroll=()=>{if(!raf)raf=requestAnimationFrame(()=>{raf=0;if(root.isConnected)fit();});};(scroller||window).addEventListener('scroll',onScroll,{passive:true,signal});window.addEventListener('resize',onScroll,{passive:true,signal});}
  function pick(id){selected=id;stage.querySelectorAll('.cc-item').forEach(n=>n.classList.toggle('cc-selected',n.dataset.element===id));}
  function add(type){if(!editable())return;checkpoint();const it={id:uid(),type,x:40,y:model.items.length?Math.max(...model.items.map(x=>x.y+x.h))+40:40,w:440,h:240,font:18,title:'',text:'',border:false};
   if(type==='media'){it.h=340;it.fit='contain';}if(type==='matrix'){it.w=380;it.h=440;it.point=null;it.left='';it.right='';it.top='';it.bottom='';}if(type==='range'){it.h=170;it.value=null;it.left='';it.right='';}if(type==='segments'){it.h=150;it.value=0;it.count=10;}if(type==='lines'||type==='checklist')it.rows=[{id:uid(),text:'',checked:false}];if(type==='heading')it.h=100;if(type==='divider')it.h=80;
@@ -2611,9 +2619,14 @@ function rkCharacterDesigner(host,p,data){
  function geometry(n,it){n.style.left=it.x+'px';n.style.top=it.y+'px';n.style.width=it.w+'px';n.style.height=it.h+'px';const bar=n.querySelector('.cc-item-tools');if(bar){bar.style.left=it.x>500?'auto':'0';bar.style.right=it.x>500?'0':'auto';}const square=n.querySelector('.cc-matrix');if(square){const size=Math.max(50,Math.min(it.w-26,it.h-72));square.style.width=size+'px';square.style.height=size+'px';}}
  function drag(e,it,node,resizing){if(!editable()||e.button!==0||e.isPrimary===false)return;e.preventDefault();e.stopPropagation();pick(it.id);const before=clone(model),old=clone(it),length=history.undo.length;checkpoint();const ac=new AbortController(),sig=ac.signal,rect=stage.getBoundingClientRect(),sx=(e.clientX-rect.left)/scale,sy=(e.clientY-rect.top)/scale;let changed=false;
   const snap=(v,ev)=>model.grid&&!ev.altKey?Math.round(v/20)*20:v;
-  function move(ev){if(!editable()){cancel();return;}const r=stage.getBoundingClientRect(),dx=(ev.clientX-r.left)/scale-sx,dy=(ev.clientY-r.top)/scale-sy;if(resizing){it.w=clamp(snap(old.w+dx,ev),it.type==='matrix'?240:160,1000-it.x);it.h=clamp(snap(old.h+dy,ev),it.type==='matrix'?240:80,4000);}else{it.x=clamp(snap(old.x+dx,ev),0,1000-it.w);it.y=clamp(snap(old.y+dy,ev),0,200000);}changed=true;geometry(node,it);fit();}
-  function end(){ac.abort();cancelDrag=null;if(changed)commit(false);else{history.undo.splice(length);buttons();}}
-  function cancel(){ac.abort();cancelDrag=null;model=before;history.undo.splice(length);draw();}cancelDrag=cancel;
+  let lastEv=null,raf=0;
+  /* Автопрокрутка у нижнего и верхнего края, пока блок тянут */
+  function tick(){raf=0;if(!lastEv)return;const y=lastEv.clientY,vb=viewBottom(),vt=viewTop();let d=0;if(y>vb-48)d=Math.min(24,(y-(vb-48))*.6);else if(y<vt+48)d=-Math.min(24,((vt+48)-y)*.6);if(!d)return;if(scroller)scroller.scrollTop+=d;else window.scrollBy(0,d);place(lastEv);raf=requestAnimationFrame(tick);}
+  function place(ev){const r=stage.getBoundingClientRect(),dx=(ev.clientX-r.left)/scale-sx,dy=(ev.clientY-r.top)/scale-sy;if(resizing){it.w=clamp(snap(old.w+dx,ev),it.type==='matrix'?240:160,1000-it.x);it.h=clamp(snap(old.h+dy,ev),it.type==='matrix'?240:80,4000);}else{it.x=clamp(snap(old.x+dx,ev),0,1000-it.w);it.y=clamp(snap(old.y+dy,ev),0,200000);}changed=true;geometry(node,it);fit();}
+  function move(ev){if(!editable()){cancel();return;}lastEv=ev;place(ev);if(!raf)raf=requestAnimationFrame(tick);}
+  function stopAuto(){lastEv=null;if(raf){cancelAnimationFrame(raf);raf=0;}}
+  function end(){stopAuto();ac.abort();cancelDrag=null;if(changed)commit(false);else{history.undo.splice(length);buttons();}}
+  function cancel(){stopAuto();ac.abort();cancelDrag=null;model=before;history.undo.splice(length);draw();}cancelDrag=cancel;
   window.addEventListener('pointermove',move,{signal:sig});window.addEventListener('pointerup',end,{once:true,signal:sig});window.addEventListener('pointercancel',cancel,{once:true,signal:sig});window.addEventListener('keydown',ev=>{if(ev.key==='Escape'){ev.preventDefault();cancel();}},{signal:sig});signal.addEventListener('abort',()=>ac.abort(),{once:true});
  }
  function field(it,k,placeholder,classes,multiline,parent){const input=editable(),n=document.createElement(input?(multiline?'textarea':'input'):(k==='title'?'h3':'div'));n.className=classes||'cc-input';if(input){if(!multiline)n.type='text';n.value=typeof it[k]==='string'?it[k]:'';n.placeholder=placeholder;n.setAttribute('aria-label',placeholder);n.dataset.ccField=k;n.oninput=()=>change(()=>it[k]=n.value,false,it.id+':'+k);n.onblur=()=>{session=null;};}else{n.textContent=typeof it[k]==='string'?it[k]:'';if(k==='title'&&!n.textContent)n.hidden=true;}parent.appendChild(n);return n;}
