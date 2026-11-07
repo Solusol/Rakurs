@@ -1710,7 +1710,7 @@ function docxToBlocks(xml){
 }
 function mdToBlocks(txt){ const out=[]; txt.replace(/\r\n?/g,'\n').split(/\n/).forEach(line=>{ const l=line.trimEnd(); if(!l.trim()) return; const h=l.match(/^(#{1,4})\s+(.*)$/); if(h){ out.push({lvl:h[1].length, html:esc(h[2].trim()), text:h[2].trim()}); return; }
   let html=esc(l.trim()).replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>').replace(/(^|[^*])\*(?!\*)(.+?)\*(?!\*)/g,'$1<em>$2</em>').replace(/_(.+?)_/g,'<em>$1</em>'); out.push({lvl:0, html, text:l.trim()}); }); return out; }
-function txtToBlocks(txt){ const out=[]; txt.replace(/\r\n?/g,'\n').split(/\n/).forEach(line=>{ const l=line.trim(); if(!l) return; const isHead=/^(глава|часть|chapter)\s*\d+/i.test(l) || /^\d{1,2}\.\s+\S/.test(l) && l.length<60 || (l.length<50 && l===l.toUpperCase() && /[А-ЯA-Z]/.test(l) && !/[.!?…]$/.test(l)); out.push({lvl:isHead?1:0, html:esc(l), text:l}); }); return out; }
+function txtToBlocks(txt){ const out=[]; txt.replace(/\r\n?/g,'\n').split(/\n/).forEach(line=>{ let l=line.trim(); if(!l) return; const deco=l.match(/^[=*#\-]{3,}\s*(.+?)\s*[=*#\-]{3,}$/); if(deco){ l=deco[1].trim(); out.push({lvl:1, html:esc(l), text:l}); return; } const isHead=/^(глава|часть|chapter)\s*\d+/i.test(l) || /^\d{1,2}\.\s+\S/.test(l) && l.length<60 || (l.length<50 && l===l.toUpperCase() && /[А-ЯA-Z]/.test(l) && !/[.!?…]$/.test(l)); out.push({lvl:isHead?1:0, html:esc(l), text:l}); }); return out; }
 function classifyBlock(b){ if(b.lvl) return b.lvl<=2?'h2':b.lvl===3?'h3':'h4'; if(/^\d{1,2}:\d\d$/.test(b.text)) return 'time'; if(/^[—–-]\s/.test(b.text)) return 'dialog'; return 'p'; }
 function splitChapters(blocks, mode){
   const chapters=[]; let cur=null; const minLvl=Math.min(...blocks.filter(b=>b.lvl).map(b=>b.lvl), 9);
@@ -1738,10 +1738,27 @@ function renderImportPreview(){
   $('#impPreview').querySelectorAll('.imp-row').forEach((row,i)=>{ const title=row.querySelector('.imp-title').value; const match=PAGES.find(p=>!p.special && p.title.trim().toLowerCase()===title.trim().toLowerCase()); if(match) row.querySelector('.imp-target').value=match.id; });
   $('#impApply').disabled=!chs.length; $('#impMsg').textContent='';
 }
+function markPov(blocks){ blocks.forEach((b,k)=>{ const n=blocks[k+1]; if(b.t==='p' && n && n.t==='time' && /^[\p{Lu}][\p{L}-]{1,20}(?: [\p{Lu}][\p{L}-]{1,20})?$/u.test(blockText(b.h))) b.t='pov'; }); return blocks; }
+function importTextInto(text, parent, splitMode){
+  if(!wsWritable()) return [];
+  const src=/^#{1,4}\s/m.test(text) ? mdToBlocks(text) : txtToBlocks(text);
+  const chs=splitChapters(src, splitMode||'h1');
+  const par=parent&&PAGE[parent]&&wsType(PAGE[parent])==='folder'?parent:'';
+  const ids=[]; const stamp=Date.now().toString(36);
+  chs.forEach((ch,i)=>{
+    const title=(ch.title||('Импорт '+(i+1))).trim();
+    const blocks=markPov(ch.blocks.filter(b=>!(b.lvl && b.text===ch.title)).map((b,k)=>({id:'i'+stamp+i.toString(36)+k.toString(36), t:classifyBlock(b), h:b.html})));
+    const id=wsId('wb'); D.pages.push({id, title, sub:'', sec:'text', parent:par, blockType:'text', blockData:{}});
+    D.ins['top:'+id]=blocks; blocks.forEach(b=>{ BLOCK[b.id]=b; PAGE_OF[b.id]=id; }); ids.push(id);
+  });
+  registerUserPages(); wsCommit(); buildToc(); route();
+  return ids;
+}
+window.RK_IMPORT_TEXT=importTextInto;
 function applyImport(){
   const rows=[...$('#impPreview').querySelectorAll('.imp-row')]; if(!rows.length) return; const sec=$('#impSec').value; let created=0, replaced=0; let firstId=null;
   rows.forEach((row,i)=>{ const ch=IMPORT.chapters[i]; const title=row.querySelector('.imp-title').value.trim()||('Импорт '+(i+1)); const target=row.querySelector('.imp-target').value;
-    const blocks=ch.blocks.filter(b=>!(b.lvl && b.text===ch.title)).map((b,k)=>({id:'i'+Date.now().toString(36)+i.toString(36)+k.toString(36), t:classifyBlock(b), h:b.html}));
+    const blocks=markPov(ch.blocks.filter(b=>!(b.lvl && b.text===ch.title)).map((b,k)=>({id:'i'+Date.now().toString(36)+i.toString(36)+k.toString(36), t:classifyBlock(b), h:b.html})));
     if(target && PAGE[target]){ const p=PAGE[target]; const full=pageBlocks(p).filter(b=>!b.deleted).map(b=>({id:b.id,t:b.t,h:b.h})); versionsOf(p.id).push({ts:Date.now(), name:'до импорта', auto:false, z:LZString.compressToUTF16(JSON.stringify({full, pageNote:D.pageNotes[p.id]||''})), n:full.length, c:full.reduce((a,b)=>a+blockText(b.h).length,0), full:true}); replacePageText(p, blocks); replaced++; firstId=firstId||p.id; }
     else { const id='np'+Date.now().toString(36)+i.toString(36); D.pages.push({id, title, sub:'', sec}); registerUserPages(); D.ins['top:'+id]=blocks; blocks.forEach(b=>{ BLOCK[b.id]=b; PAGE_OF[b.id]=id; }); created++; firstId=firstId||id; } });
   save(); buildToc(); $('#importModal').hidden=true; if(firstId) nav('#/'+firstId); else route();
