@@ -1,0 +1,19 @@
+/* Restore drag target outlines only; remove the extra box-shadow stripe. */
+html body.ws-block-dnd #side #toc [data-ws-reorder]:is(.ws-block-before,.ws-block-after),
+html body.ws-block-dnd #view [data-ws-reorder]:is(.ws-block-before,.ws-block-after) {
+  outline: 2px solid var(--rk-secondary, var(--heading-2)) !important;
+  outline-offset: 3px !important;
+  box-shadow: none !important;
+}
+html body.ws-block-dnd #side #toc .ws-block-into,
+html body.ws-block-dnd #view .ws-block-into,
+html body.ws-block-dnd #crumb .ws-block-into {
+  outline: 2px dashed var(--rk-secondary, var(--heading-2)) !important;
+  outline-offset: 2px !important;
+  box-shadow: none !important;
+}
+html body.ws-block-dnd #view .ws-block-append {
+  outline: 2px solid var(--rk-secondary, var(--heading-2)) !important;
+  outline-offset: 3px !important;
+  box-shadow: none !important;
+}
