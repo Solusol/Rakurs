@@ -1498,7 +1498,7 @@ function collect(scope){
 }
 function exportText(pages, opts){ // opts: {content, fmt('md'|'txt'), mark, orig}
   const md = opts.fmt==='md'; const L=[];
-  const title = pages.length===1 ? pages[0].title : (pages.length===PAGES.length ? CUR_PROJ.name+' — все материалы' : pages[0].section.title);
+  const title = pages.length===1 ? pages[0].title : (pages.length===PAGES.length ? CUR_PROJ.name+' — все материалы' : CUR_PROJ.name);
   L.push(md?`# ${title}`:title.toUpperCase(), '');
   if(opts.content!=='text') L.push(md?`_Экспорт от ${new Date().toLocaleString('ru')}_`:`Экспорт от ${new Date().toLocaleString('ru')}`, '');
   pages.forEach(p=>{
@@ -1535,7 +1535,7 @@ function exportText(pages, opts){ // opts: {content, fmt('md'|'txt'), mark, orig
 }
 function exportHTML(pages, opts){
   const parts=[`<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>${esc(CUR_PROJ.name)} — экспорт</title><style>@page{margin:2cm}@media print{body{max-width:none;margin:0}.note,blockquote,table,figure{break-inside:avoid}}body{font-family:Georgia,serif;max-width:720px;margin:40px auto;padding:0 20px;line-height:1.6;color:#201d19}h1{font-weight:500}h2{margin-top:2em}.pov{font-family:sans-serif;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:#5f584e;margin-top:2em}.time{font-family:sans-serif;font-size:12px;letter-spacing:.08em;color:#5f584e;border-top:1px solid #ddd;padding-top:10px;margin-top:1.6em}.note{font-family:sans-serif;font-size:13px;background:#fbf3dc;border:1px solid #e3cf93;border-radius:8px;padding:8px 10px;margin:4px 0 14px}.note q{font-style:italic;color:#5f584e}.orig{font-family:sans-serif;font-size:12.5px;color:#5f584e;background:#eef2f5;padding:6px 10px;border-radius:6px;margin:2px 0 10px}.ed{border-left:3px solid #3f6a8a;padding-left:8px}table{border-collapse:collapse;font-family:sans-serif;font-size:13px}td,th{border:1px solid #ccc;padding:5px 8px;vertical-align:top}.num{color:#aaa;font-family:sans-serif;font-size:11px;margin-right:6px}</style></head><body>`];
-  const title = pages.length===1 ? pages[0].title : (pages.length===PAGES.length ? CUR_PROJ.name+' — все материалы' : pages[0].section.title);
+  const title = pages.length===1 ? pages[0].title : (pages.length===PAGES.length ? CUR_PROJ.name+' — все материалы' : CUR_PROJ.name);
   parts.push(`<h1>${esc(title)}</h1>`);
   pages.forEach(p=>{
     const blocks=pageBlocks(p).filter(b=>!b.deleted); let n=0; const nums={}; blocks.forEach(b=>{ if(!HEAD_TYPES.has(b.t)) nums[b.id]=++n; });
@@ -1575,7 +1575,7 @@ function runsFromHTML(h, d, base){
 }
 async function exportDocx(pages, opts){
   await loadDocx(); const d=window.docx; const ch=[];
-  const title = pages.length===1 ? pages[0].title : (pages.length===PAGES.length ? CUR_PROJ.name+' — все материалы' : pages[0].section.title);
+  const title = pages.length===1 ? pages[0].title : (pages.length===PAGES.length ? CUR_PROJ.name+' — все материалы' : CUR_PROJ.name);
   ch.push(new d.Paragraph({text:title, heading:d.HeadingLevel.TITLE}));
   const notePara=(label, text, quote)=>new d.Paragraph({shading:{type:d.ShadingType.CLEAR, fill:'FBF3DC'}, spacing:{after:160}, children:[new d.TextRun({text:label+(quote?` («${quote}»)`:'')+': ', bold:true, size:20, font:'Arial'}), ...text.split('\n').flatMap((ln,i)=>[...(i?[new d.TextRun({break:1})]:[]), new d.TextRun({text:ln, size:20, font:'Arial'})])]});
   pages.forEach(p=>{
@@ -1614,12 +1614,17 @@ function download(blob, name){
   try{ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); }, 2000); return true; }catch(e){ return false; }
 }
 function slug(s){ return s.replace(/[«»"']/g,'').replace(/[^\p{L}\p{N}]+/gu,'-').replace(/^-|-$/g,'').slice(0,50); }
+function exPages(){ const ws=wsPanePages(); return ws.length ? ws : PAGES.filter(p=>!p.special); }
+function exDepth(p){ return wsUser(p) ? wsPath(p).length : 0; }
+function exSelected(){
+  const ids=new Set($$('#exScopeList input[name=exs]:checked').map(i=>i.value));
+  return exPages().filter(p=>ids.has(p.id) && (wsType(p)!=='folder' || pageBlocks(p).some(b=>!b.deleted)));
+}
+function exSyncAll(){ const all=$$('#exScopeList input[name=exs]'); const on=all.length&&all.every(i=>i.checked); const b=$('#exScopeAll'); if(b) b.textContent=on?'Снять выбор':'Выбрать все'; }
 function openExport(){
-  const sel=$('#exScope'); sel.innerHTML='';
-  if(curPage) sel.innerHTML += `<option value="page">Эта страница — ${esc(curPage.title)}</option>`;
-  sel.innerHTML += `<option value="reader">Текст и экстры (${collect('reader').length} стр.)</option>`;
-  C.sections.forEach(s=>{ if(!s.pages.length) return; sel.innerHTML += `<option value="sec:${s.id}">Раздел — ${esc(groupOf(s).title)} · ${esc(secLabel(s))} (${s.pages.filter(p=>!p.special).length})</option>`; });
-  sel.innerHTML += `<option value="all">Всё целиком (${PAGES.length} страниц)</option>`;
+  const list=$('#exScopeList');
+  list.innerHTML = `<button type="button" class="link-btn dim" id="exScopeAll">Выбрать все</button>` + exPages().map(p=>`<label class="ex-item" style="padding-left:${exDepth(p)*18}px"><input type="checkbox" name="exs" value="${p.id}"${curPage&&curPage.id===p.id?' checked':''}> ${esc(p.title)}${wsUser(p)?` <span class="muted small">· ${esc(wsLabel(p))}</span>`:''}</label>`).join('');
+  exSyncAll();
   $('#exPreviewWrap').hidden=true; $('#exCopy').hidden=true; $('#exDownload').hidden=true; $('#exMsg').textContent='';
   $$('#exPresets .chip').forEach(c=>c.classList.remove('on')); $('#exPresetHint').textContent='';
   $('#exportModal').hidden=false;
@@ -1629,12 +1634,13 @@ const EX_PRESETS={
   beta:{scope:'reader', content:'both', hint:'Главы и экстры с заметками к фрагментам и к страницам — для беты или редактора. База истории не включается.'},
   all:{scope:'all', content:'both', hint:'Всё, что есть: текст, экстры, база истории, заметки.'}
 };
-function applyPreset(id){ const pr=EX_PRESETS[id]; if(!pr) return; $$('#exPresets .chip').forEach(c=>c.classList.toggle('on', c.dataset.preset===id)); const sel=$('#exScope'); if(![...sel.options].some(o=>o.value===pr.scope)) sel.innerHTML+=`<option value="reader">Текст и экстры (${collect('reader').length} стр.)</option>`; sel.value=pr.scope; $(`input[name=exc][value=${pr.content}]`).checked=true; $('#exPresetHint').textContent=pr.hint; }
+function applyPreset(id){ const pr=EX_PRESETS[id]; if(!pr) return; $$('#exPresets .chip').forEach(c=>c.classList.toggle('on', c.dataset.preset===id)); $$('#exScopeList input[name=exs]').forEach(i=>i.checked=true); exSyncAll(); $(`input[name=exc][value=${pr.content}]`).checked=true; $('#exPresetHint').textContent=pr.hint; }
 let lastExport=null;
 async function runExport(){
-  const scope=$('#exScope').value, content=$('input[name=exc]:checked').value, fmt=$('input[name=exf]:checked').value;
+  const content=$('input[name=exc]:checked').value, fmt=$('input[name=exf]:checked').value;
   const opts={content, fmt, mark:false, orig:false};
-  const pages=collect(scope); const base = pages.length===1 ? slug(pages[0].title) : (scope==='all'?'limb-vse':slug(pages[0].section.title));
+  const pages=exSelected(); if(!pages.length){ $('#exMsg').textContent='Отметь, что выгружать.'; return; }
+  const base = pages.length===1 ? slug(pages[0].title) : slug(CUR_PROJ.name)||'vse';
   const stamp=new Date().toISOString().slice(0,10);
   $('#exMsg').textContent='Собираю…';
   try{
@@ -1910,7 +1916,8 @@ function init(){
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') hidePopmenus(); });
   $('#btnExport').onclick=openExport; $('#exRun').onclick=runExport;
   $('#exPresets').addEventListener('click', e=>{ const c=e.target.closest('.chip'); if(c) applyPreset(c.dataset.preset); });
-  $('#exScope').addEventListener('change', ()=>{ $$('#exPresets .chip').forEach(c=>c.classList.remove('on')); $('#exPresetHint').textContent=''; });
+  $('#exScopeList').addEventListener('change', e=>{ const i=e.target; if(i&&i.name==='exs'&&PAGE[i.value]&&wsType(PAGE[i.value])==='folder'){ $$('#exScopeList input[name=exs]').forEach(o=>{ if(o!==i&&wsDescendant(o.value,i.value)) o.checked=i.checked; }); } exSyncAll(); $$('#exPresets .chip').forEach(c=>c.classList.remove('on')); $('#exPresetHint').textContent=''; });
+  $('#exScopeList').addEventListener('click', e=>{ if(e.target.id!=='exScopeAll') return; const all=$$('#exScopeList input[name=exs]'); const on=!all.every(i=>i.checked); all.forEach(i=>i.checked=on); exSyncAll(); $$('#exPresets .chip').forEach(c=>c.classList.remove('on')); $('#exPresetHint').textContent=''; });
   $('#betaCopy').onclick=()=>{ if(!curPage||curPage.special) return; const html=exportHTML([curPage], {content:$('#betaNotes').checked?'both':'text', fmt:'html', mark:false, orig:false}); const ok=download(new Blob([html],{type:'text/html;charset=utf-8'}), `${slug(curPage.title)}-beta.html`); toast(ok?'Файл с главой скачан — его можно отправить бета‑ридеру':'Скачивание не удалось'); };
   $('#btnNotes').onclick=openNotes; $('#notesClearPage').onclick=()=>{ if(!curPage) return; $('#notesModal').hidden=true; clearPageNotes(curPage); };
   buildInsertMenu(); bindFmtbar();
@@ -1924,7 +1931,7 @@ function init(){
   $('#chTitle').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); saveChapterDialog(); } });
   $('#chDelete').onclick=()=>{ const b=$('#chDelete'); if(!b.dataset.armed){ b.dataset.armed='1'; b.textContent='Точно удалить? Нажми ещё раз'; return; } const pid=$('#chapterModal').dataset.page; $('#chapterModal').hidden=true; deleteUserPage(pid); toast('Страница удалена'); };
   $('#btnCopy').onclick=async()=>{ if(!curPage) return; const ok=await copyText(plainText([curPage])); toast(ok?'Текст главы скопирован (без заметок)':'Не удалось скопировать'); };
-  $('#exCopyPlain').onclick=async()=>{ const pages=collect($('#exScope').value); await copyText(plainText(pages), $('#exMsg')); };
+  $('#exCopyPlain').onclick=async()=>{ const pages=exSelected(); if(!pages.length){ $('#exMsg').textContent='Отметь, что выгружать.'; return; } await copyText(plainText(pages), $('#exMsg')); };
   $('#exCopy').onclick=()=>copyText(lastExport.text, $('#exMsg'));
   $('#exDownload').onclick=()=>{ if(!download(lastExport.blob, lastExport.name)) $('#exMsg').textContent='Скачивание заблокировано — скопируй текст из поля'; };
   $('#btnProject').onclick=openProject;
