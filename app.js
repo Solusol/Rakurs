@@ -3388,6 +3388,7 @@ html body[data-rk-mode].mode-edit .seg-btn.on{color:var(--rk-on-primary)!importa
 html body[data-rk-mode] :is(.btn,.seg-btn) .count{background:transparent!important;color:inherit!important;border:1px solid currentColor!important}
 html body[data-rk-mode] :is(.ws-rename-title,.page-head h1,.ws-home-title h1,.pane-title){color:var(--rk-heading)!important}
 html body[data-rk-mode] .look .tile .fs{color:var(--rk-text)!important}
+html body[data-rk-palette="indigo"][data-rk-mode] .ws-kind-select label:has(input:checked),html body[data-rk-palette="terra"][data-rk-mode] .ws-kind-select label:has(input:checked){background:var(--rk-primary)!important;color:var(--rk-on-primary)!important}
 html body[data-rk-mode] #view .ws-card[data-ws-kind=folder]>.rk-folder-contour>path{fill:var(--rk-heading)!important}
 html body[data-rk-mode] #view .ws-card[data-ws-kind=folder] :is(.ws-card-title,.ws-card-icon,.ws-type){color:var(--rk-on-folder)!important}
 html body[data-rk-mode] :is(input,textarea)::placeholder{opacity:.7!important}
