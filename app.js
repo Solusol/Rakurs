@@ -1850,7 +1850,7 @@ function renderBrand(){ if(!CUR_PROJ.builtin||PROJ.setup) document.title=CUR_PRO
 function needsStart(){ return CUR_PROJ.builtin && !PROJ.setup && PROJ.list.length===1 && !C.sections.some(s=>(s.pages||[]).some(p=>!p.special)) && isEmptyData(D); }
 function showStart(){
   const st=document.createElement('div'); st.className='start rk-start-cover'; st.id='startScreen';
-  st.innerHTML=`<div class="rk-start-film"><img class="rk-start-bg" src="assets/backgrounds/main.png" alt="Ракурс — пространство для твоих историй" draggable="false"><button type="button" class="rk-start-btn" id="startCreate" aria-label="Открыть"><img class="rk-start-btn-img" src="assets/buttons/open.png" alt="Открыть" draggable="false"><img class="rk-start-btn-img-hover" src="assets/buttons/open-hover.png" alt="" aria-hidden="true" draggable="false"></button></div>`;
+  st.innerHTML=`<div class="rk-start-film"><img class="rk-start-bg" src="assets/backgrounds/main-web.webp" alt="Ракурс — пространство для твоих историй" draggable="false"><button type="button" class="rk-start-btn" id="startCreate" aria-label="Открыть"><img class="rk-start-btn-img" src="assets/buttons/open.png" alt="Открыть" draggable="false"><img class="rk-start-btn-img-hover" src="assets/buttons/open-hover.png" alt="" aria-hidden="true" draggable="false"></button></div>`;
   document.body.appendChild(st); document.body.classList.add('has-start');
   $('#startCreate', st).onclick=()=>lookDialog({mode:'first', onDone:(l,nm)=>{ CUR_PROJ.name=nm; CUR_PROJ.look=l; PROJ.setup=true; saveProjects(PROJ); prefs.font=l.font; savePrefs(); st.remove(); document.body.classList.remove('has-start'); location.hash='#/'; location.reload(); }});
 }
