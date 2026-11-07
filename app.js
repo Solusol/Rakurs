@@ -276,7 +276,7 @@ function setPaneMin(on){ prefs.paneMin=!!on; savePrefs(); document.body.classLis
 function applySide(){ document.body.classList.toggle('side-hidden', !!prefs.sideHidden); const b=$('#btnHideSide'); b.title=prefs.sideHidden?'Показать оглавление':'Скрыть оглавление'; b.classList.toggle('on', !!prefs.sideHidden); }
 function wsPanePages(){
  const out=[],seen=new Set();
- function branch(parent){wsChildren(parent).forEach(p=>{if(seen.has(p.id)||!wsUser(p))return;seen.add(p.id);out.push(p);if(wsType(p)==='folder')branch(p.id);});}
+ function branch(parent){wsChildren(parent).forEach(p=>{if(seen.has(p.id)||!wsUser(p))return;seen.add(p.id);out.push(p);if(wsType(p)==='folder'||wsType(p)==='text')branch(p.id);});}
  branch('');PAGES.forEach(p=>{if(wsUser(p)&&!seen.has(p.id)){seen.add(p.id);out.push(p);}});return out;
 }
 function wsPaneSelect(){
@@ -539,7 +539,7 @@ function badgesHTML(st){ return st.notes?`<span class="badge n" title="заме�
 function refreshBadges(){
   let total=0; PAGES.forEach(p=>{ total+=pageStats(p).notes; }); const nc=$('#noteCount'); if(nc) nc.textContent=total;
   updateClearBtn();
-  $$('#toc a').forEach(a=>{ const p=PAGE[a.dataset.page]; if(p) a.querySelector('.badges').innerHTML = badgesHTML(pageStats(p)); a.classList.toggle('on', curPage && a.dataset.page===curPage.id); });
+  $$('#toc a').forEach(a=>{ const p=PAGE[a.dataset.page]; if(p) a.querySelector('.badges').innerHTML = badgesHTML(pageStats(p)); a.classList.toggle('on', curPage && (a.dataset.page===curPage.id || (wsUser(curPage) && a.dataset.page===wsBook(curPage).id))); });
 }
 function openSide(){ $('#side').classList.add('open'); $('#sideShade').classList.add('on'); }
 function closeSide(){ $('#side').classList.remove('open'); $('#sideShade').classList.remove('on'); }
@@ -1743,7 +1743,7 @@ function importTextInto(text, parent, splitMode){
   if(!wsWritable()) return [];
   const src=/^#{1,4}\s/m.test(text) ? mdToBlocks(text) : txtToBlocks(text);
   const chs=splitChapters(src, splitMode||'h1');
-  const par=parent&&PAGE[parent]&&wsType(PAGE[parent])==='folder'?parent:'';
+  const par=parent&&PAGE[parent]&&(wsType(PAGE[parent])==='folder'||wsType(PAGE[parent])==='text')?parent:'';
   const ids=[]; const stamp=Date.now().toString(36);
   chs.forEach((ch,i)=>{
     const title=(ch.title||('Импорт '+(i+1))).trim();
@@ -1755,6 +1755,7 @@ function importTextInto(text, parent, splitMode){
   return ids;
 }
 window.RK_IMPORT_TEXT=importTextInto;
+window.RK_WS_MOVE=function(ids, parent){ if(!wsWritable()) return 0; ids=[].concat(ids); const par=parent&&PAGE[parent]&&(wsType(PAGE[parent])==='folder'||wsType(PAGE[parent])==='text')?parent:''; let n=0; ids.forEach(id=>{ const u=wsUser(id); if(!u||id===par||(par&&wsDescendant(par,id))) return; u.parent=par; n++; }); const ws=wsData(); if(ws.blockOrder){ for(const k in ws.blockOrder) ws.blockOrder[k]=ws.blockOrder[k].filter(x=>!ids.includes(x)); } registerUserPages(); wsCommit(); buildToc(); route(); return n; };
 function applyImport(){
   const rows=[...$('#impPreview').querySelectorAll('.imp-row')]; if(!rows.length) return; const sec=$('#impSec').value; let created=0, replaced=0; let firstId=null;
   rows.forEach((row,i)=>{ const ch=IMPORT.chapters[i]; const title=row.querySelector('.imp-title').value.trim()||('Импорт '+(i+1)); const target=row.querySelector('.imp-target').value;
@@ -2112,7 +2113,9 @@ function wsUser(p){ return (D.pages||[]).find(u=>u.id===(typeof p==='string'?p:p
 function wsType(p){ const u=wsUser(p); return u&&u.blockType||'text'; }
 function wsLabel(p){ const t=WS_TYPES.find(t=>t[0]===wsType(p)); return t?t[1]:'Текст'; }
 function wsWritable(){ if(tabReadOnly){ toast('Это окно только для чтения — перенеси редактирование сюда'); return false; } return true; }
-function wsParent(p){ const u=wsUser(p), id=u&&u.parent; return id&&PAGE[id]&&wsType(PAGE[id])==='folder'?id:''; }
+function wsParent(p){ const u=wsUser(p), id=u&&u.parent; return id&&PAGE[id]&&(wsType(PAGE[id])==='folder'||wsType(PAGE[id])==='text')?id:''; }
+function wsBook(p){ const par=wsParent(p); return par&&wsType(PAGE[par])==='text'?PAGE[par]:p; }
+function wsChapters(p){ return wsChildren(p.id).filter(ch=>wsType(ch)==='text'); }
 function wsChildren(parent){
  const list=PAGES.filter(p=>wsParent(p)===(parent||''));
  const stored=(wsData().blockOrder||{})[parent||'$root'];
@@ -2194,9 +2197,9 @@ function wsClonePage(srcId,parent,map,top){
  }
  if(D.pageNotes&&D.pageNotes[srcId]) D.pageNotes[nid]=D.pageNotes[srcId];
  const ws=wsData(); if(ws.textFieldColors&&ws.textFieldColors[srcId]) ws.textFieldColors[nid]=ws.textFieldColors[srcId];
- if(wsType(p)==='folder'){
+ if(wsType(p)==='folder'||wsType(p)==='text'){
   const kids=wsChildren(srcId); kids.forEach(ch=>wsClonePage(ch.id,nid,map,false));
-  ws.blockOrder=ws.blockOrder||{}; ws.blockOrder[nid]=kids.map(ch=>map[ch.id]).filter(Boolean);
+  if(kids.length){ ws.blockOrder=ws.blockOrder||{}; ws.blockOrder[nid]=kids.map(ch=>map[ch.id]).filter(Boolean); }
  }
  return nid;
 }
@@ -2224,12 +2227,12 @@ function wsPurgePage(pid){
 function wsDelete(id){
  if(!wsWritable()) return;
  const p=PAGE[id]; if(!p||!wsUser(p)) return;
- const ids=[]; (function walk(x){ ids.push(x); if(PAGE[x]&&wsType(PAGE[x])==='folder') wsChildren(x).forEach(ch=>walk(ch.id)); })(id);
+ const ids=[]; (function walk(x){ ids.push(x); if(PAGE[x]) wsChildren(x).forEach(ch=>walk(ch.id)); })(id);
  const inner=ids.length-1, type=wsType(p);
  const fem=['timeline','map','board','location'].includes(type);
  const what = type==='folder'
   ? 'Папка «'+esc(p.title)+'»'+(inner?' и '+inner+' '+(inner===1?'вложенный блок':inner<5?'вложенных блока':'вложенных блоков'):'')+' будут удалены'
-  : wsLabel(p)+' «'+esc(p.title)+'» будет удален'+(fem?'а':'');
+  : wsLabel(p)+' «'+esc(p.title)+'» будет удален'+(fem?'а':'')+(inner?' вместе с главами ('+inner+')':'');
  const m=dlg('Удалить блок','<p>'+what+' вместе со всем содержимым. Отменить это будет нельзя.</p>',()=>{
   if(!wsWritable()) return false;
   const parent=wsParent(p); const wasCurrent=!!(curPage&&ids.includes(curPage.id));
@@ -2320,10 +2323,9 @@ function rkContents(p,host,side){
  const menu=document.createElement('div');menu.className='rk-contents-menu';menu.hidden=true;menu.setAttribute('role','group');menu.setAttribute('aria-label','Главы проекта');
  function populate(){
   menu.replaceChildren();const ordered=[],seen=new Set();
-  function branch(parent){wsChildren(parent).forEach(ch=>{if(seen.has(ch.id))return;seen.add(ch.id);if(wsType(ch)==='text')ordered.push(ch);if(wsType(ch)==='folder')branch(ch.id);});}
-  branch('');PAGES.forEach(ch=>{if(!seen.has(ch.id)&&wsType(ch)==='text')ordered.push(ch);});
+  const book=wsBook(p); ordered.push(book); wsChapters(book).forEach(ch=>{if(!seen.has(ch.id)){seen.add(ch.id);ordered.push(ch);}});
   ordered.forEach(ch=>{const b=document.createElement('button');b.type='button';b.textContent=ch.title;b.dataset.chapter=ch.id;if(ch.id===p.id)b.setAttribute('aria-current','page');b.onclick=()=>{menu.hidden=true;button.setAttribute('aria-expanded','false');if(side){prefs.split=ch.id;savePrefs();renderPane();}else nav('#/'+ch.id);};menu.appendChild(b);});
-  const add=document.createElement('button');add.type='button';add.className='rk-add-chapter';add.textContent='Добавить главу';add.onclick=()=>{menu.hidden=true;button.setAttribute('aria-expanded','false');rkAddChapter(wsParent(p));};menu.appendChild(add);
+  const add=document.createElement('button');add.type='button';add.className='rk-add-chapter';add.textContent='Добавить главу';add.onclick=()=>{menu.hidden=true;button.setAttribute('aria-expanded','false');rkAddChapter(wsBook(p).id);};menu.appendChild(add);
  }
  button.onclick=()=>{const opening=menu.hidden;if(opening)populate();menu.hidden=!opening;button.setAttribute('aria-expanded',String(opening));if(opening)menu.querySelector('button')?.focus();};
  rkDropdownEvents(control,button,menu);control.append(button,menu);host.prepend(control);
@@ -2332,7 +2334,7 @@ function rkAddChapter(parent){
  if(!wsWritable())return;
  dlg('Добавить главу','<div class="field"><label for="rk-chapter-title">Название</label><input id="rk-chapter-title" maxlength="160" autocomplete="off"></div>',m=>{
   if(!wsWritable())return false;const input=m.querySelector('#rk-chapter-title'),name=input.value.trim();if(!name){input.focus();return false;}
-  const id=wsId('wb');D.pages.push({id,title:name,sub:'',sec:'text',parent:parent&&PAGE[parent]&&wsType(PAGE[parent])==='folder'?parent:'',blockType:'text',blockData:{}});
+  const id=wsId('wb');D.pages.push({id,title:name,sub:'',sec:'text',parent:parent&&PAGE[parent]&&(wsType(PAGE[parent])==='folder'||wsType(PAGE[parent])==='text')?parent:'',blockType:'text',blockData:{}});
   registerUserPages();wsCommit();buildToc();nav('#/'+id);setMode('edit');setTimeout(()=>{if(curPage&&curPage.id===id&&!pageBlocks(curPage).length)insertBlock('top:'+id,'',true,'p');},80);
  },'Создать');setTimeout(()=>document.getElementById('rk-chapter-title')?.focus(),30);
 }
