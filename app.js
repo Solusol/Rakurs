@@ -3,7 +3,7 @@
 /* several independent projects live side by side; «main» is Лимб with the built-in text, others start empty */
 const PROJ_KEY='wsblankProjects';
 function loadProjects(){ let r=null; try{ r=JSON.parse(localStorage.getItem(PROJ_KEY)||'null'); }catch(e){} if(!r || !r.list) r={cur:'main', list:[{id:'main', name:'Ракурс', builtin:true}]}; if(!r.list.find(x=>x.id==='main')) r.list.unshift({id:'main', name:'Ракурс', builtin:true}); if(!r.list.find(x=>x.id===r.cur)) r.cur='main'; return r; }
-function saveProjects(r){ try{ localStorage.setItem(PROJ_KEY, JSON.stringify(r)); }catch(e){} }
+function saveProjects(r){ r.updated=Date.now(); try{ localStorage.setItem(PROJ_KEY, JSON.stringify(r)); }catch(e){} try{ if(window.RK_CLOUD) RK_CLOUD.pushProjects(r); }catch(e){} }
 const PROJ=loadProjects(); const CUR_PROJ=PROJ.list.find(x=>x.id===PROJ.cur);
 function blankContent(){ return {sections:[{id:'text',title:'Текст',pages:[]},{id:'extra',title:'Экстры',pages:[]},{id:'ref',title:'Материалы',pages:[]}], seeds:{}, characters:[]}; }
 const C = blankContent(); // Only the current project data; no shipped story or seed notes.
@@ -109,7 +109,7 @@ function setStoreState(cls, text){
 }
 let lastWriteOK=true;
 let saveT=null, dirty=false;
-function flush(){ clearTimeout(saveT); saveT=null; if(!dirty) return; dirty=false; if(storageOK){ const ok = store.write(D); lastWriteOK=ok; if(ok) setStoreState('ok','Сохранено в браузере · '+new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})); else setStoreState('bad','Не удалось сохранить в браузере — сохрани файл проекта'); } }
+function flush(){ clearTimeout(saveT); saveT=null; if(!dirty) return; dirty=false; if(storageOK){ const ok = store.write(D); lastWriteOK=ok; if(ok){ try{ if(window.RK_CLOUD) RK_CLOUD.push(KEY, D); }catch(e){} } if(ok) setStoreState('ok','Сохранено в браузере · '+new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})); else setStoreState('bad','Не удалось сохранить в браузере — сохрани файл проекта'); } }
 function save(){
   if(tabReadOnly){ if(Date.now()-(save._ro||0)>5000 && document.hasFocus()){ save._ro=Date.now(); toast('Это окно только для чтения: проект редактируется в другом окне'); } return; }
   D.updated = Date.now(); dirty=true; TEXTS=null; if(curPage) cacheBase(curPage); if(storageOK) setStoreState('saving');
@@ -2897,6 +2897,7 @@ wsInstallStyles();wsInstallBlockOrdering();
 const wsSearch=document.getElementById('search');if(wsSearch){wsSearch.placeholder='Поиск';wsSearch.setAttribute('aria-label','Поиск');}
 
 window.__limb={get D(){return D}, pageBlocks, PAGE}; window.selInfo=selInfo;
+window.RK_CLOUD_UI={ key:KEY, projId:CUR_PROJ.id, toast:(m)=>toast(m), isDirty:()=>dirty||!!saveT, apply:(k)=>{ if(k!==KEY||dirty||saveT) return false; reloadFromStore(); return true; } };
 init();
 })();
 

@@ -15,7 +15,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
 <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
 <script>window.LIMB_LOGOS={base:"assets/logo-base.svg",indigo:"assets/logo-indigo.svg",terra:"assets/logo-terra.svg"};</script>
-<link rel="stylesheet" href="styles.css?v=20261107-start-2">
+<link rel="stylesheet" href="styles.css?v=20261107-cloud-1">
 <style id="dialog-and-sidebar-ui">
 #projectModal #projStore,#projectModal #projStats,#projectModal #projClear,
 #projectModal .data-where,#projectModal #projOffline,#projectModal .row-btns:has(>#projRefresh){display:none!important;}
@@ -169,10 +169,13 @@ html body.ws-block-dnd .ws-block-into {outline:none!important;box-shadow:none!im
 </div></div></div>
 <div class="toast" id="toast" hidden></div>
 <div class="note-sheet" id="noteSheet" hidden><div class="sheet-head"><span id="noteSheetTitle">Заметки к абзацу</span><button class="icon-btn" id="noteSheetClose" aria-label="Закрыть">✕</button></div><div class="sheet-body" id="noteSheetBody"></div></div>
-<script>window.LIMB_V="20261107-start-2";</script>
+<script>window.LIMB_V="20261107-cloud-1";</script>
 <script src="lz-string.min.js?v=9a6ab976"></script>
 <script src="content.js?v=9a6ab976"></script>
-<script src="app.js?v=20261107-start-2"></script>
+<script src="supabase.js?v=20261107-cloud-1"></script>
+<script src="cloud-config.js?v=20261107-cloud-1"></script>
+<script src="cloud.js?v=20261107-cloud-1"></script>
+<script>(function(){ function go(){ var s=document.createElement('script'); s.src='app.js?v=20261107-cloud-1'; document.body.appendChild(s); } var p; try{ p=window.RK_CLOUD&&RK_CLOUD.boot(); }catch(e){} (p&&p.then?p:Promise.resolve()).then(go, go); })();</script>
 <script id="sidebar-ui">(function(){
  'use strict';
  const status=document.getElementById('storageState');

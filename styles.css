@@ -949,3 +949,14 @@ body.has-start{overflow:hidden}
 .start.rk-start-cover .rk-start-btn img.rk-start-btn-img-hover{display:none}
 .start.rk-start-cover .rk-start-btn:hover img.rk-start-btn-img{display:none}
 .start.rk-start-cover .rk-start-btn:hover img.rk-start-btn-img-hover{display:block}
+
+
+/* Облако: ссылка в подвале оглавления и окно входа */
+.side-foot .link-btn.rk-cloud{flex:1 0 100%;text-align:left;text-decoration:none;font-size:14px;color:var(--muted)}
+.side-foot .link-btn.rk-cloud:hover{color:var(--green-2)}
+.side-foot .link-btn.rk-cloud.ok{color:var(--muted)}
+.side-foot .link-btn.rk-cloud.bad{color:#c9765c}
+.side-foot .link-btn.rk-cloud.sync{opacity:.8}
+.rk-cloud-modal .dlgbox-body .row-btns{align-items:center;flex-wrap:wrap}
+.rk-cloud-modal .rk-cloud-msg{min-height:1.4em;margin-top:8px}
+.rk-cloud-modal .rk-cloud-msg.bad{color:#c9765c}
