@@ -109,6 +109,7 @@ async function pullAll(opts){
     // список историй: объединяем; при более свежем облаке берём его имена и оформление
     for(const ce of cloudList){ const le=proj.list.find(x=>x.id===ce.id); if(!le){ proj.list.push(Object.assign({}, ce)); projChanged=true; } else if(cloudNewer){ if(le.name!==ce.name||JSON.stringify(le.look||null)!==JSON.stringify(ce.look||null)){ le.name=ce.name; le.look=ce.look; projChanged=true; } } }
     if(meta&&meta.projects&&meta.projects.setup&&!proj.setup){ proj.setup=true; projChanged=true; }
+    if(!proj.setup && (rows||[]).some(r=>!r.deleted)){ proj.setup=true; projChanged=true; }
     if(proj.setup && !(meta&&meta.projects&&meta.projects.setup)) metaChanged=true;
     for(const le of proj.list){ if(!cloudList.find(x=>x.id===le.id)) metaChanged=true; }
     const u=ui(); const curKey = u&&u.key;
@@ -168,10 +169,17 @@ async function boot(){
 }
 function withTimeout(p, ms){ return Promise.race([p, new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')), ms))]); }
 async function afterLogin(){
-  // первый вход на этом устройстве: объединяем локальное и облачное, затем перезагружаем, чтобы список историй обновился
-  const res = await pullAll({boot:true});
-  toast('Вход выполнен — истории синхронизированы');
-  setTimeout(()=>location.reload(), 900);
+  // вход: объединяем локальное и облачное. Если истории уже есть — перезагружаем в рабочее пространство,
+  // если аккаунт пустой — отдаём управление стартовому экрану (окно «Новая история»).
+  await pullAll({boot:true});
+  const proj=readProj();
+  if(proj.setup){ toast('Вход выполнен — истории синхронизированы'); setTimeout(()=>location.reload(), 600); return; }
+  if(typeof window.RK_CLOUD.onLoginFresh==='function'){ renderLink(); window.RK_CLOUD.onLoginFresh(); return; }
+  location.reload();
+}
+async function flushNow(){
+  for(const id in timers){ if(id==='__meta') continue; if(timers[id]){ clearTimeout(timers[id]); timers[id]=null; await pushNow(id); } }
+  clearTimeout(timers.__meta); await pushMetaNow();
 }
 
 /* ---------- интерфейс ---------- */
@@ -181,7 +189,7 @@ function renderLink(){
   if(!enabled){ if(b) b.remove(); return; }
   if(!b){ b=document.createElement('button'); b.type='button'; b.className='link-btn rk-cloud'; b.id='btnCloud'; b.onclick=()=>openDialog(); foot.insertBefore(b, foot.firstChild); }
   b.classList.remove('ok','bad','sync');
-  if(!user){ b.textContent='Войти в облако'; b.title='Хранить истории в облаке и открывать их на других устройствах'; return; }
+  if(!user){ b.remove(); return; }
   const t = lastSync ? new Date(lastSync).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}) : '';
   if(state==='syncing'){ b.textContent='Облако · синхронизация…'; b.classList.add('sync'); }
   else if(state==='offline'){ b.textContent='Облако · нет сети'; b.classList.add('bad'); }
@@ -199,7 +207,7 @@ function openDialog(view){
     let body='';
     if(v==='login') body=`<div class="field"><label for="rkcEmail">Почта</label><input type="email" id="rkcEmail" autocomplete="username" required></div>
       <div class="field"><label for="rkcPass">Пароль</label><input type="password" id="rkcPass" autocomplete="current-password" required minlength="6"></div>
-      <div class="row-btns"><button class="btn primary" type="submit" data-a="login">Войти</button><button class="btn" type="button" data-v="signup">Создать аккаунт</button><button class="link-btn" type="button" data-v="reset">Забыла пароль</button></div>`;
+      <div class="row-btns"><button class="btn primary" type="submit" data-a="login">Войти</button><button class="btn" type="button" data-v="signup">Создать аккаунт</button><button class="link-btn" type="button" data-v="reset">Не помню пароль</button></div>`;
     else if(v==='signup') body=`<p class="muted">Истории будут храниться в облаке и открываться на любом устройстве после входа.</p>
       <div class="field"><label for="rkcEmail">Почта</label><input type="email" id="rkcEmail" autocomplete="username" required></div>
       <div class="field"><label for="rkcPass">Пароль (не короче 6 символов)</label><input type="password" id="rkcPass" autocomplete="new-password" required minlength="6"></div>
@@ -234,7 +242,7 @@ function openDialog(view){
     };
     m.querySelectorAll('[data-a=sync],[data-a=logout]').forEach(b=>b.onclick=async()=>{
       if(b.dataset.a==='sync'){ busy(true); say('Синхронизация…'); const u=ui(); const r=await pullAll(); busy(false); if(r){ say(pending.size?'Часть историй не отправилась: '+lastError:'Готово.', !!pending.size); if(r.projChanged) setTimeout(()=>location.reload(), 700); } else say(lastError||'Не удалось связаться с облаком', true); }
-      else { await sb.auth.signOut(); user=null; setState('off'); close(); toast('Выход выполнен'); }
+      else { await sb.auth.signOut(); user=null; setState('off'); close(); toast('Выход выполнен'); setTimeout(()=>location.reload(), 700); }
     });
     setTimeout(()=>{ const f=form.querySelector('input'); if(f) f.focus(); }, 30);
   };
@@ -252,5 +260,5 @@ function humanErr(e){
   return s;
 }
 
-window.RK_CLOUD = { enabled, boot, push, pushProjects, openDialog, sync:()=>pullAll(), get user(){ return user; }, get state(){ return state; } };
+window.RK_CLOUD = { enabled, boot, push, pushProjects, openDialog, flushNow, onLoginFresh:null, sync:()=>pullAll(), get user(){ return user; }, get state(){ return state; } };
 })();

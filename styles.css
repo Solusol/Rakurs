@@ -957,6 +957,7 @@ body.has-start{overflow:hidden}
 .side-foot .link-btn.rk-cloud.ok{color:var(--muted)}
 .side-foot .link-btn.rk-cloud.bad{color:#c9765c}
 .side-foot .link-btn.rk-cloud.sync{opacity:.8}
+.rk-cloud-modal{z-index:90}
 .rk-cloud-modal .dlgbox-body .row-btns{align-items:center;flex-wrap:wrap}
 .rk-cloud-modal .rk-cloud-msg{min-height:1.4em;margin-top:8px}
 .rk-cloud-modal .rk-cloud-msg.bad{color:#c9765c}
