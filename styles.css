@@ -978,3 +978,19 @@ body.has-start{overflow:hidden}
 .ws-card:hover .ws-acts,.ws-card:focus-within .ws-acts,#toc>a[data-page]:hover .ws-acts,#toc>a[data-page]:focus-within .ws-acts{opacity:1}
 .ws-dup-btn:hover,.ws-dup-btn:focus-visible{opacity:1}
 @media (hover:none){.ws-acts{opacity:.8}}
+
+/* Верхняя панель: без «Экспорта» и сброса форматирования; порядок и единый размер иконок */
+.fmtbar [data-cmd=clear]{display:none}
+.bar-right>#btnExport{display:none}
+.bar-right>#btnNotes{order:1}
+.bar-right>#btnVersions{order:2}
+.bar-right>#btnCopy{order:3}
+.bar-right>#btnSplit{order:4}
+.bar-right>#rkFieldColorToolbar{order:5}
+.bar-right>#btnFont{order:6}
+.bar-right>#btnHand{order:7}
+.bar-right>#saveState{order:8}
+.bar-right>#btnFocus{order:9}
+html body .bar-right #rkFieldColorToolbar>button.rk-field-palette-trigger{width:34px!important;height:34px!important;min-width:34px!important;flex:0 0 34px!important;border-radius:999px!important}
+html body .bar-right #rkFieldColorToolbar>button.rk-field-palette-trigger>svg{width:18px!important;height:18px!important}
+.bar-right .icon-btn svg{width:18px;height:18px}

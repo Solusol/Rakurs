@@ -15,7 +15,7 @@
 <link rel="icon" type="image/png" sizes="32x32" href="assets/icons/favicon-32.png">
 <link rel="icon" type="image/svg+xml" href="assets/logo.svg">
 <script>window.LIMB_LOGOS={base:"assets/logo-base.svg",indigo:"assets/logo-indigo.svg",terra:"assets/logo-terra.svg"};</script>
-<link rel="stylesheet" href="styles.css?v=20261107-book-1">
+<link rel="stylesheet" href="styles.css?v=20261107-bar-1">
 <style id="dialog-and-sidebar-ui">
 #projectModal #projStore,#projectModal #projStats,#projectModal #projClear,
 #projectModal .data-where,#projectModal #projOffline,#projectModal .row-btns:has(>#projRefresh){display:none!important;}
@@ -82,7 +82,7 @@ html body.ws-block-dnd .ws-block-into {outline:none!important;box-shadow:none!im
         <div class="bar-right">
           <button class="btn" id="btnNotes" title="Все заметки проекта">Заметки <span class="count" id="noteCount">0</span></button>
           <button class="btn" id="btnExport">Экспорт</button>
-          <button class="btn" id="btnCopy" hidden title="Скопировать текст страницы без заметок">Копировать</button>
+          <button class="icon-btn" id="btnCopy" hidden title="Скопировать текст страницы без заметок" aria-label="Скопировать текст страницы без заметок"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M15 9V5.5A1.5 1.5 0 0 0 13.5 4h-8A1.5 1.5 0 0 0 4 5.5v8A1.5 1.5 0 0 0 5.5 15H9"/></svg></button>
           <button class="btn" id="btnVersions" hidden title="История версий страницы">Версии</button>
           <span class="save-state" id="saveState" hidden></span>
           <button class="icon-btn" id="btnFocus" title="Только текст: скрыть оглавление и вторую панель"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/><path d="M9 12h6"/></svg></button>
@@ -169,14 +169,14 @@ html body.ws-block-dnd .ws-block-into {outline:none!important;box-shadow:none!im
 </div></div></div>
 <div class="toast" id="toast" hidden></div>
 <div class="note-sheet" id="noteSheet" hidden><div class="sheet-head"><span id="noteSheetTitle">Заметки к абзацу</span><button class="icon-btn" id="noteSheetClose" aria-label="Закрыть">✕</button></div><div class="sheet-body" id="noteSheetBody"></div></div>
-<script>window.LIMB_V="20261107-book-1";</script>
+<script>window.LIMB_V="20261107-bar-1";</script>
 <script src="lz-string.min.js?v=9a6ab976"></script>
 <script src="content.js?v=9a6ab976"></script>
-<script src="supabase.js?v=20261107-book-1"></script>
-<script src="cloud-config.js?v=20261107-book-1"></script>
-<script src="cloud.js?v=20261107-book-1"></script>
-<script src="sounds.js?v=20261107-book-1" defer></script>
-<script>(function(){ function go(){ var s=document.createElement('script'); s.src='app.js?v=20261107-book-1'; document.body.appendChild(s); } var p; try{ p=window.RK_CLOUD&&RK_CLOUD.boot(); }catch(e){} (p&&p.then?p:Promise.resolve()).then(go, go); })();</script>
+<script src="supabase.js?v=20261107-bar-1"></script>
+<script src="cloud-config.js?v=20261107-bar-1"></script>
+<script src="cloud.js?v=20261107-bar-1"></script>
+<script src="sounds.js?v=20261107-bar-1" defer></script>
+<script>(function(){ function go(){ var s=document.createElement('script'); s.src='app.js?v=20261107-bar-1'; document.body.appendChild(s); } var p; try{ p=window.RK_CLOUD&&RK_CLOUD.boot(); }catch(e){} (p&&p.then?p:Promise.resolve()).then(go, go); })();</script>
 <script id="sidebar-ui">(function(){
  'use strict';
  const status=document.getElementById('storageState');

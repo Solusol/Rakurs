@@ -1201,7 +1201,7 @@ function updateFmtbar(){
 }
 function buildFmtMenus(){
   const mk=(id, items, onpick)=>{ const m=document.createElement('div'); m.id=id; m.className='popmenu'; m.hidden=true; m.innerHTML=items.map(([v,l,cls])=>`<button type="button" data-v="${v}" class="${cls||''}"><span class="pv">${l}</span></button>`).join(''); m.addEventListener('mousedown',e=>e.preventDefault()); m.addEventListener('click',e=>{ const b=e.target.closest('button[data-v]'); if(!b) return; hidePopmenus(); onpick(b.dataset.v); }); document.body.appendChild(m); return m; };
-  mk('styleMenu', [['p','Обычный текст','st-p'],['dialog','— Реплика','st-p'],['h2','Заголовок','st-h2'],['h3','Подзаголовок','st-h3'],['time','Время','st-time'],['pov','POV','st-pov'],['callout','Врезка','st-callout'],['quote','Цитата','st-quote']], applyStyle);
+  mk('styleMenu', [['p','Обычный текст','st-p'],['h2','Заголовок','st-h2'],['h3','Подзаголовок','st-h3'],['time','Время','st-time'],['pov','POV','st-pov']], applyStyle);
   mk('tableMenu', [['addrow','+ строка ниже'],['addcol','+ столбец справа'],['delrow','− строка'],['delcol','− столбец'],['deltable','Удалить таблицу']], v=>{ const info=selInfo(); const id=info?info.id1:lastFocusId; const el=document.getElementById('b-'+id); const body=bodyOf(el); if(!body) return; if(v==='deltable'){ deleteCurrentBlock(); return; } pushHistory('op'); tableOp(body, v); commitBlock(id); });
   mk('mediaMenu', [['replace','Заменить'],['del','Удалить']], v=>{ const id=lastFocusId; if(v==='replace') openMediaDialog(id); else deleteCurrentBlock(); });
   mk('origMenu', [['show','Показать исходник'],['restore','Вернуть исходный текст']], v=>{ const info=selInfo(); const b=info?VIEW[info.id1]:null; if(!b) return; if(v==='restore') restoreOriginal(); else { const el=document.getElementById('b-'+b.id); const ex=el.querySelector('.orig'); if(ex){ ex.remove(); return; } const o=document.createElement('div'); o.className='orig'; o.contentEditable='false'; o.innerHTML=`<b>Исходник:</b> ${b.orig}`; el.querySelector('.toolslot').appendChild(o); } });
@@ -1381,7 +1381,7 @@ const ICONS = {
   media:'<svg viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="14" rx="1.5"/><circle cx="9" cy="10" r="1.6"/><path d="M4 17l5-4.5 3.5 3 3-2.5L20 17"/></svg>',
   hr:'<svg viewBox="0 0 24 24"><path d="M4 12h16M9 6h6M9 18h6"/></svg>'
 };
-const INSERT_ITEMS=[['p','Абзац'],['dialog','Реплика'],['h2','Заголовок'],['h3','Подзаголовок'],['time','Время'],['pov','POV'],['callout','Врезка'],['quote','Цитата'],['list','Список'],['olist','Нумерованный'],['table','Таблица'],['profile','Профайл'],['media','Фото / видео'],['hr','Разделитель']];
+const INSERT_ITEMS=[['quote','Цитата'],['table','Таблица'],['media','Фото / видео'],['hr','Разделитель']];
 function buildInsertMenu(){
   const m=document.createElement('div'); m.id='insertMenu'; m.hidden=true; m.setAttribute('role','menu');
   m.innerHTML=INSERT_ITEMS.map(([t,l])=>`<button type="button" role="menuitem" data-t="${t}">${ICONS[t]}<span>${l}</span></button>`).join('');
