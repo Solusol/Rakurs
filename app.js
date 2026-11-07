@@ -1916,6 +1916,8 @@ function init(){
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') hidePopmenus(); });
   $('#btnExport').onclick=openExport; $('#exRun').onclick=runExport;
   $('#exPresets').addEventListener('click', e=>{ const c=e.target.closest('.chip'); if(c) applyPreset(c.dataset.preset); });
+  document.addEventListener('click', e=>{ const b=e.target.closest&&e.target.closest('[data-ws-dup]'); if(!b) return; e.preventDefault(); e.stopPropagation(); wsDuplicate(b.dataset.wsDup); }, true);
+  document.addEventListener('mousedown', e=>{ if(e.target.closest&&e.target.closest('[data-ws-dup]')) e.stopPropagation(); }, true);
   $('#exScopeList').addEventListener('change', e=>{ const i=e.target; if(i&&i.name==='exs'&&PAGE[i.value]&&wsType(PAGE[i.value])==='folder'){ $$('#exScopeList input[name=exs]').forEach(o=>{ if(o!==i&&wsDescendant(o.value,i.value)) o.checked=i.checked; }); } exSyncAll(); $$('#exPresets .chip').forEach(c=>c.classList.remove('on')); $('#exPresetHint').textContent=''; });
   $('#exScopeList').addEventListener('click', e=>{ if(e.target.id!=='exScopeAll') return; const all=$$('#exScopeList input[name=exs]'); const on=!all.every(i=>i.checked); all.forEach(i=>i.checked=on); exSyncAll(); $$('#exPresets .chip').forEach(c=>c.classList.remove('on')); $('#exPresetHint').textContent=''; });
   $('#betaCopy').onclick=()=>{ if(!curPage||curPage.special) return; const html=exportHTML([curPage], {content:$('#betaNotes').checked?'both':'text', fmt:'html', mark:false, orig:false}); const ok=download(new Blob([html],{type:'text/html;charset=utf-8'}), `${slug(curPage.title)}-beta.html`); toast(ok?'Файл с главой скачан — его можно отправить бета‑ридеру':'Скачивание не удалось'); };
@@ -2115,7 +2117,7 @@ function buildToc(){
    if(seen.has(p.id)) return; const next=new Set(seen); next.add(p.id);
    const a=document.createElement('a'); a.href='#/'+p.id; a.dataset.page=p.id;
    a.style.paddingLeft=(12+depth*14)+'px';a.dataset.wsReorder=p.id;a.draggable=!tabReadOnly;
-   a.innerHTML='<span class="t"><small class="ws-type">'+esc(wsLabel(p))+'</small>'+esc(p.title)+'</span><span class="badges"></span>';
+   a.innerHTML='<span class="t"><small class="ws-type">'+esc(wsLabel(p))+'</small>'+esc(p.title)+'</span>'+(tabReadOnly?'':wsDupButton(p))+'<span class="badges"></span>';
    toc.appendChild(a); if(wsType(p)==='folder') branch(p.id,depth+1,next);
   });
  }
@@ -2131,7 +2133,7 @@ function wsCard(p){
  const u=wsUser(p), data=u&&u.blockData||{};
  const canvas=u&&(u.blockType==='character'?data.characterCanvas:u.blockType==='location'?data.locationCanvas:null);const preview=canvas&&Array.isArray(canvas.items)?(canvas.items.find(it=>it&&it.type==='media'&&it.media&&it.media.kind==='image'&&wsTimelineMediaSafe(it.media))||{}).media:null;const src=canvas?(preview&&preview.src):data.image;
  const image=src&&wsTimelineMediaSafe({kind:'image',src})?'<img class="ws-card-image" src="'+esc(src)+'" alt="" loading="lazy">':'';
- return '<a class="ws-card" data-ws-kind="'+esc(wsType(p))+'" draggable="'+(!tabReadOnly)+'" data-ws-reorder="'+p.id+'" href="#/'+p.id+'">'+image+'<span class="ws-type">'+esc(wsLabel(p))+'</span><span class="ws-card-title">'+esc(p.title)+'</span>'+wsCardIcon(wsType(p))+'</a>';
+ return '<a class="ws-card" data-ws-kind="'+esc(wsType(p))+'" draggable="'+(!tabReadOnly)+'" data-ws-reorder="'+p.id+'" href="#/'+p.id+'">'+image+'<span class="ws-type">'+esc(wsLabel(p))+'</span><span class="ws-card-title">'+esc(p.title)+'</span>'+wsCardIcon(wsType(p))+(tabReadOnly?'':wsDupButton(p))+'</a>';
 }
 function wsListing(parent){
  const pages=wsChildren(parent);
@@ -2154,6 +2156,46 @@ function renderHome(){
  const remove=v.querySelector('[data-uncover]'); if(remove) remove.onclick=()=>{if(!wsWritable())return;wsData().cover='';wsCommit();renderHome();};
  v.querySelector('[data-ws-add]').onclick=()=>wsCreate('');window.scrollTo(0,0);
 }
+function wsCopyTitle(title){
+ const base=String(title||'').replace(/\s*\(копия(?: \d+)?\)$/u,'').trim()||'Без названия';
+ const names=new Set((D.pages||[]).map(u=>u.title)); let t=base+' (копия)', n=2;
+ while(names.has(t)) t=base+' (копия '+(n++)+')';
+ return t;
+}
+function wsClonePage(srcId,parent,map,top){
+ const u=wsUser(srcId), p=PAGE[srcId]; if(!u||!p) return null;
+ const nid=wsId('wb'); map[srcId]=nid;
+ const copy=JSON.parse(JSON.stringify(u)); copy.id=nid; copy.parent=parent||''; if(top) copy.title=wsCopyTitle(u.title);
+ D.pages.push(copy);
+ const blocks=pageBlocks(p).filter(b=>!b.deleted);
+ if(blocks.length){
+  const bmap={}; const stamp=Date.now().toString(36);
+  const fresh=blocks.map((b,k)=>{ const id='u'+stamp+k.toString(36)+Math.random().toString(36).slice(2,6); bmap[b.id]=id; return {id, t:b.t, h:b.h}; });
+  D.ins['top:'+nid]=fresh; fresh.forEach(b=>{ BLOCK[b.id]=b; PAGE_OF[b.id]=nid; });
+  for(const old in bmap){ if(D.notes[old]) D.notes[bmap[old]]=JSON.parse(JSON.stringify(D.notes[old])); }
+  Object.values(D.anns||{}).forEach(a=>{ if(!bmap[a.b1]) return; const c=JSON.parse(JSON.stringify(a)); c.id='a'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); c.b1=bmap[a.b1]; if(c.b2) c.b2=bmap[c.b2]||c.b2; c.pid=nid; D.anns[c.id]=c; });
+ }
+ if(D.pageNotes&&D.pageNotes[srcId]) D.pageNotes[nid]=D.pageNotes[srcId];
+ const ws=wsData(); if(ws.textFieldColors&&ws.textFieldColors[srcId]) ws.textFieldColors[nid]=ws.textFieldColors[srcId];
+ if(wsType(p)==='folder'){
+  const kids=wsChildren(srcId); kids.forEach(ch=>wsClonePage(ch.id,nid,map,false));
+  ws.blockOrder=ws.blockOrder||{}; ws.blockOrder[nid]=kids.map(ch=>map[ch.id]).filter(Boolean);
+ }
+ return nid;
+}
+function wsDuplicate(id){
+ if(!wsWritable()) return;
+ const p=PAGE[id]; if(!p||!wsUser(p)) return;
+ const parent=wsParent(p); const ws=wsData(); ws.blockOrder=ws.blockOrder||{};
+ const key=parent||'$root'; const order=wsChildren(parent).map(x=>x.id);
+ const nid=wsClonePage(id,parent,{},true); if(!nid) return;
+ order.splice(order.indexOf(id)+1,0,nid); ws.blockOrder[key]=order;
+ registerUserPages();
+ if(!wsCommit()){ toast('Копия не сохранена: недостаточно места или хранилище недоступно'); }
+ buildToc(); if((!curPage&&!parent)||(curPage&&curPage.id===parent)) route();
+ toast('Блок скопирован: '+PAGE[nid].title);
+}
+function wsDupButton(p){ return '<button type="button" class="ws-dup-btn" data-ws-dup="'+esc(p.id)+'" title="Дублировать «'+esc(p.title)+'»" aria-label="Дублировать «'+esc(p.title)+'»"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M15 9V5.5A1.5 1.5 0 0 0 13.5 4h-8A1.5 1.5 0 0 0 4 5.5v8A1.5 1.5 0 0 0 5.5 15H9"/></svg></button>'; }
 function wsCreate(parent){
  if(!wsWritable())return;
  dlg('Добавить блок','<div class="field"><label for="ws-title">Название</label><input id="ws-title" maxlength="160" autocomplete="off"></div><fieldset class="ws-kind-select"><legend>Формат</legend>'+WS_TYPES.map((t,i)=>'<label><input type="radio" name="ws-kind" value="'+t[0]+'"'+(i===0?' checked':'')+'><span>'+t[1]+'</span></label>').join('')+'</fieldset>',m=>{
@@ -2544,7 +2586,7 @@ function rkCharacterDesigner(host,p,data){
  }
  function field(it,k,placeholder,classes,multiline,parent){const input=editable(),n=document.createElement(input?(multiline?'textarea':'input'):(k==='title'?'h3':'div'));n.className=classes||'cc-input';if(input){if(!multiline)n.type='text';n.value=typeof it[k]==='string'?it[k]:'';n.placeholder=placeholder;n.setAttribute('aria-label',placeholder);n.dataset.ccField=k;n.oninput=()=>change(()=>it[k]=n.value,false,it.id+':'+k);n.onblur=()=>{session=null;};}else{n.textContent=typeof it[k]==='string'?it[k]:'';if(k==='title'&&!n.textContent)n.hidden=true;}parent.appendChild(n);return n;}
  function mediaDialog(it){if(!editable())return;let active=true,busy=false;
-  const modal=dlg('Фото / видео / GIF','<div class="field"><label>Файл с компьютера</label><input type="file" data-cc-file accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/ogg"><span class="muted small">Фото оптимизируются, GIF сохраняет анимацию. Большое видео может не поместиться в хранилище браузера.</span></div><div class="field"><label>Или прямая ссылка на файл</label><input type="url" data-cc-url placeholder="https://…" autocomplete="off"></div><div class="field"><label>Тип файла по ссылке</label><select data-cc-kind><option value="image">Фото / GIF</option><option value="video">Видео</option></select></div><p data-cc-status role="status"></p>',m=>{if(busy||!editable())return false;const current=model.items.find(x=>x.id===it.id);if(!current)return false;it=current;const media={kind:m.querySelector('[data-cc-kind]').value,src:m.querySelector('[data-cc-url]').value.trim(),name:''};if(!wsTimelineMediaSafe(media)){m.querySelector('[data-cc-status]').textContent='Нужна прямая ссылка http или https на файл.';return false;}checkpoint();it.media=media;return commit(true);},'Добавить ссылку');
+  const modal=dlg('Фото / видео / GIF','<div class="field"><label>Файл с компьютера</label><input type="file" data-cc-file accept="image/jpeg,image/png,image/webp,image/gif,video/mp4,video/webm,video/ogg"></div><div class="field"><label>Или прямая ссылка на файл</label><input type="url" data-cc-url placeholder="https://…" autocomplete="off"></div><div class="field"><label>Тип файла по ссылке</label><select data-cc-kind><option value="image">Фото / GIF</option><option value="video">Видео</option></select></div><p data-cc-status role="status"></p>',m=>{if(busy||!editable())return false;const current=model.items.find(x=>x.id===it.id);if(!current)return false;it=current;const media={kind:m.querySelector('[data-cc-kind]').value,src:m.querySelector('[data-cc-url]').value.trim(),name:''};if(!wsTimelineMediaSafe(media)){m.querySelector('[data-cc-status]').textContent='Нужна прямая ссылка http или https на файл.';return false;}checkpoint();it.media=media;return commit(true);},'Добавить ссылку');
   modal.addEventListener('click',e=>{if(e.target===modal||e.target.closest('[data-close]'))active=false;},{signal});const input=modal.querySelector('[data-cc-file]'),status=modal.querySelector('[data-cc-status]'),ok=modal.querySelector('#spOk');
   input.onchange=async()=>{const f=input.files[0];if(!f||!editable())return;const ext=f.name.split('.').pop().toLowerCase(),mime={jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',webp:'image/webp',gif:'image/gif',mp4:'video/mp4',webm:'video/webm',ogg:'video/ogg',ogv:'video/ogg'}[ext];if(!mime||f.size>25*1024*1024){status.textContent='Поддерживаются JPG, PNG, WebP, GIF, MP4, WebM и Ogg до 25 МБ. Для большого файла используй прямую ссылку.';return;}busy=true;input.disabled=true;ok.disabled=true;status.textContent='Подготовка файла…';
    try{let src=await new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=()=>reject(Error('Не удалось прочитать файл'));r.readAsDataURL(new Blob([f],{type:mime}));});
