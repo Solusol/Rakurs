@@ -967,12 +967,14 @@ body.has-start{overflow:hidden}
 #exScopeList>.link-btn{align-self:flex-start;margin-bottom:2px}
 #exScopeList .ex-item input{accent-color:var(--rk-primary,var(--green,currentColor))}
 
-/* Дублирование блока: кнопка на карточке и в оглавлении */
-.ws-dup-btn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0;margin:0;border:1px solid currentColor;border-radius:7px;background:transparent;color:inherit;cursor:pointer;opacity:0;transition:opacity .15s ease;flex:0 0 auto}
+/* Дублирование и удаление блока: кнопки на карточке и в оглавлении */
+.ws-acts{display:inline-flex;align-items:center;gap:6px;opacity:0;transition:opacity .15s ease;flex:0 0 auto}
+.ws-dup-btn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0;margin:0;border:1px solid currentColor;border-radius:7px;background:transparent;color:inherit;cursor:pointer;opacity:.75;flex:0 0 auto}
 .ws-dup-btn svg{display:block}
 .ws-card{position:relative}
-.ws-card .ws-dup-btn{position:absolute;top:10px;right:10px}
-#toc>a[data-page] .ws-dup-btn{align-self:center;margin-right:2px;width:22px;height:22px}
-.ws-card:hover .ws-dup-btn,.ws-card:focus-within .ws-dup-btn,#toc>a[data-page]:hover .ws-dup-btn,#toc>a[data-page]:focus-within .ws-dup-btn,.ws-dup-btn:focus-visible{opacity:.75}
-.ws-dup-btn:hover,.ws-dup-btn:focus-visible{opacity:1!important}
-@media (hover:none){.ws-dup-btn{opacity:.6}}
+.ws-card .ws-acts{position:absolute;top:10px;right:10px}
+#toc>a[data-page] .ws-acts{align-self:center;margin-right:2px}
+#toc>a[data-page] .ws-dup-btn{width:22px;height:22px}
+.ws-card:hover .ws-acts,.ws-card:focus-within .ws-acts,#toc>a[data-page]:hover .ws-acts,#toc>a[data-page]:focus-within .ws-acts{opacity:1}
+.ws-dup-btn:hover,.ws-dup-btn:focus-visible{opacity:1}
+@media (hover:none){.ws-acts{opacity:.8}}

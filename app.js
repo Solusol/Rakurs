@@ -1916,8 +1916,8 @@ function init(){
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') hidePopmenus(); });
   $('#btnExport').onclick=openExport; $('#exRun').onclick=runExport;
   $('#exPresets').addEventListener('click', e=>{ const c=e.target.closest('.chip'); if(c) applyPreset(c.dataset.preset); });
-  document.addEventListener('click', e=>{ const b=e.target.closest&&e.target.closest('[data-ws-dup]'); if(!b) return; e.preventDefault(); e.stopPropagation(); wsDuplicate(b.dataset.wsDup); }, true);
-  document.addEventListener('mousedown', e=>{ if(e.target.closest&&e.target.closest('[data-ws-dup]')) e.stopPropagation(); }, true);
+  document.addEventListener('click', e=>{ const b=e.target.closest&&e.target.closest('[data-ws-dup],[data-ws-del]'); if(!b) return; e.preventDefault(); e.stopPropagation(); if(b.dataset.wsDup) wsDuplicate(b.dataset.wsDup); else wsDelete(b.dataset.wsDel); }, true);
+  document.addEventListener('mousedown', e=>{ if(e.target.closest&&e.target.closest('[data-ws-dup],[data-ws-del]')) e.stopPropagation(); }, true);
   $('#exScopeList').addEventListener('change', e=>{ const i=e.target; if(i&&i.name==='exs'&&PAGE[i.value]&&wsType(PAGE[i.value])==='folder'){ $$('#exScopeList input[name=exs]').forEach(o=>{ if(o!==i&&wsDescendant(o.value,i.value)) o.checked=i.checked; }); } exSyncAll(); $$('#exPresets .chip').forEach(c=>c.classList.remove('on')); $('#exPresetHint').textContent=''; });
   $('#exScopeList').addEventListener('click', e=>{ if(e.target.id!=='exScopeAll') return; const all=$$('#exScopeList input[name=exs]'); const on=!all.every(i=>i.checked); all.forEach(i=>i.checked=on); exSyncAll(); $$('#exPresets .chip').forEach(c=>c.classList.remove('on')); $('#exPresetHint').textContent=''; });
   $('#betaCopy').onclick=()=>{ if(!curPage||curPage.special) return; const html=exportHTML([curPage], {content:$('#betaNotes').checked?'both':'text', fmt:'html', mark:false, orig:false}); const ok=download(new Blob([html],{type:'text/html;charset=utf-8'}), `${slug(curPage.title)}-beta.html`); toast(ok?'Файл с главой скачан — его можно отправить бета‑ридеру':'Скачивание не удалось'); };
@@ -2117,7 +2117,7 @@ function buildToc(){
    if(seen.has(p.id)) return; const next=new Set(seen); next.add(p.id);
    const a=document.createElement('a'); a.href='#/'+p.id; a.dataset.page=p.id;
    a.style.paddingLeft=(12+depth*14)+'px';a.dataset.wsReorder=p.id;a.draggable=!tabReadOnly;
-   a.innerHTML='<span class="t"><small class="ws-type">'+esc(wsLabel(p))+'</small>'+esc(p.title)+'</span>'+(tabReadOnly?'':wsDupButton(p))+'<span class="badges"></span>';
+   a.innerHTML='<span class="t"><small class="ws-type">'+esc(wsLabel(p))+'</small>'+esc(p.title)+'</span>'+wsActButtons(p)+'<span class="badges"></span>';
    toc.appendChild(a); if(wsType(p)==='folder') branch(p.id,depth+1,next);
   });
  }
@@ -2133,7 +2133,7 @@ function wsCard(p){
  const u=wsUser(p), data=u&&u.blockData||{};
  const canvas=u&&(u.blockType==='character'?data.characterCanvas:u.blockType==='location'?data.locationCanvas:null);const preview=canvas&&Array.isArray(canvas.items)?(canvas.items.find(it=>it&&it.type==='media'&&it.media&&it.media.kind==='image'&&wsTimelineMediaSafe(it.media))||{}).media:null;const src=canvas?(preview&&preview.src):data.image;
  const image=src&&wsTimelineMediaSafe({kind:'image',src})?'<img class="ws-card-image" src="'+esc(src)+'" alt="" loading="lazy">':'';
- return '<a class="ws-card" data-ws-kind="'+esc(wsType(p))+'" draggable="'+(!tabReadOnly)+'" data-ws-reorder="'+p.id+'" href="#/'+p.id+'">'+image+'<span class="ws-type">'+esc(wsLabel(p))+'</span><span class="ws-card-title">'+esc(p.title)+'</span>'+wsCardIcon(wsType(p))+(tabReadOnly?'':wsDupButton(p))+'</a>';
+ return '<a class="ws-card" data-ws-kind="'+esc(wsType(p))+'" draggable="'+(!tabReadOnly)+'" data-ws-reorder="'+p.id+'" href="#/'+p.id+'">'+image+'<span class="ws-type">'+esc(wsLabel(p))+'</span><span class="ws-card-title">'+esc(p.title)+'</span>'+wsCardIcon(wsType(p))+wsActButtons(p)+'</a>';
 }
 function wsListing(parent){
  const pages=wsChildren(parent);
@@ -2195,6 +2195,38 @@ function wsDuplicate(id){
  buildToc(); if((!curPage&&!parent)||(curPage&&curPage.id===parent)) route();
  toast('Блок скопирован: '+PAGE[nid].title);
 }
+function wsPurgePage(pid){
+ D.pages=(D.pages||[]).filter(x=>x.id!==pid);
+ Object.keys(D.ins).filter(k=>k==='top:'+pid || PAGE_OF[k]===pid).forEach(k=>{ D.ins[k].forEach(b=>{ delete D.notes[b.id]; delete D.edits[b.id]; delete BLOCK[b.id]; delete PAGE_OF[b.id]; }); delete D.ins[k]; });
+ if(D.pageNotes) delete D.pageNotes[pid];
+ for(const k in (D.anns||{})){ const a=D.anns[k]; if(a.pid===pid || (a.b1&&PAGE_OF[a.b1]===pid)) delete D.anns[k]; }
+ if(D.versions) delete D.versions[pid];
+ const ws=wsData(); if(ws.textFieldColors) delete ws.textFieldColors[pid];
+ if(ws.blockOrder){ delete ws.blockOrder[pid]; for(const k in ws.blockOrder) ws.blockOrder[k]=ws.blockOrder[k].filter(x=>x!==pid); }
+}
+function wsDelete(id){
+ if(!wsWritable()) return;
+ const p=PAGE[id]; if(!p||!wsUser(p)) return;
+ const ids=[]; (function walk(x){ ids.push(x); if(PAGE[x]&&wsType(PAGE[x])==='folder') wsChildren(x).forEach(ch=>walk(ch.id)); })(id);
+ const inner=ids.length-1, type=wsType(p);
+ const fem=['timeline','map','board','location'].includes(type);
+ const what = type==='folder'
+  ? 'Папка «'+esc(p.title)+'»'+(inner?' и '+inner+' '+(inner===1?'вложенный блок':inner<5?'вложенных блока':'вложенных блоков'):'')+' будут удалены'
+  : wsLabel(p)+' «'+esc(p.title)+'» будет удален'+(fem?'а':'');
+ const m=dlg('Удалить блок','<p>'+what+' вместе со всем содержимым. Отменить это будет нельзя.</p>',()=>{
+  if(!wsWritable()) return false;
+  const parent=wsParent(p); const wasCurrent=!!(curPage&&ids.includes(curPage.id));
+  if(prefs.split&&ids.includes(prefs.split)){ prefs.split=''; savePrefs(); }
+  ids.forEach(wsPurgePage);
+  registerUserPages(); if(!wsCommit()) toast('Изменение не сохранено: хранилище недоступно');
+  buildToc();
+  if(wasCurrent) nav(parent&&PAGE[parent]?'#/'+parent:'#/'); else if((!curPage&&!parent)||(curPage&&curPage.id===parent)) route(); else if(document.body.classList.contains('split')) renderPane();
+  toast('Удалено: '+p.title);
+ },'Удалить');
+ const ok=m.querySelector('#spOk'); if(ok) ok.className='btn danger';
+}
+function wsDelButton(p){ return '<button type="button" class="ws-dup-btn ws-del-btn" data-ws-del="'+esc(p.id)+'" title="Удалить «'+esc(p.title)+'»" aria-label="Удалить «'+esc(p.title)+'»"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>'; }
+function wsActButtons(p){ return tabReadOnly?'':'<span class="ws-acts">'+wsDupButton(p)+wsDelButton(p)+'</span>'; }
 function wsDupButton(p){ return '<button type="button" class="ws-dup-btn" data-ws-dup="'+esc(p.id)+'" title="Дублировать «'+esc(p.title)+'»" aria-label="Дублировать «'+esc(p.title)+'»"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="1.5"/><path d="M15 9V5.5A1.5 1.5 0 0 0 13.5 4h-8A1.5 1.5 0 0 0 4 5.5v8A1.5 1.5 0 0 0 5.5 15H9"/></svg></button>'; }
 function wsCreate(parent){
  if(!wsWritable())return;
