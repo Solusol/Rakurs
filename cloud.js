@@ -191,10 +191,10 @@ function renderLink(){
   b.classList.remove('ok','bad','sync');
   if(!user){ b.remove(); return; }
   const t = lastSync ? new Date(lastSync).toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}) : '';
-  if(state==='syncing'){ b.textContent='Облако · синхронизация…'; b.classList.add('sync'); }
-  else if(state==='offline'){ b.textContent='Облако · нет сети'; b.classList.add('bad'); }
-  else if(state==='error'){ b.textContent='Облако · не удалось сохранить'; b.classList.add('bad'); }
-  else { b.textContent='Облако · '+(t?('синхронизировано в '+t):'подключено'); b.classList.add('ok'); }
+  if(state==='syncing'){ b.textContent='Синхронизация…'; b.classList.add('sync'); }
+  else if(state==='offline'){ b.textContent='Нет сети — изменения отправятся позже'; b.classList.add('bad'); }
+  else if(state==='error'){ b.textContent='Не удалось сохранить в облако'; b.classList.add('bad'); }
+  else { b.textContent=t?('Синхронизировано в '+t):'Облако подключено'; b.classList.add('ok'); }
   b.title=(user.email||'')+(lastError&&state==='error'?' · '+lastError:'');
 }
 function openDialog(view){
