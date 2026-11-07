@@ -994,3 +994,14 @@ body.has-start{overflow:hidden}
 html body .bar-right #rkFieldColorToolbar>button.rk-field-palette-trigger{width:34px!important;height:34px!important;min-width:34px!important;flex:0 0 34px!important;border-radius:999px!important}
 html body .bar-right #rkFieldColorToolbar>button.rk-field-palette-trigger>svg{width:18px!important;height:18px!important}
 .bar-right .icon-btn svg{width:18px;height:18px}
+
+/* Восстановленные мелочи: окно версий без подсказок, заметка без уголка, сворачивание папок, иерархия в «Содержании» */
+#verNow{display:none}
+.page-note textarea{resize:none}
+.toc-fold{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;padding:0;margin:0 2px 0 0;border:0;background:transparent;color:inherit;cursor:pointer;opacity:.7;align-self:center;flex:0 0 auto}
+.toc-fold svg{display:block;transition:transform .18s ease}
+.toc-fold[aria-expanded="false"] svg{transform:rotate(-90deg)}
+.toc-fold:hover,.toc-fold:focus-visible{opacity:1}
+html body .rk-contents-menu button.rk-contents-book{font-weight:600;border-bottom:1px solid var(--line);border-radius:0;padding-bottom:10px;margin-bottom:4px}
+html body .rk-contents-menu button.rk-contents-chapter{padding-left:28px;position:relative}
+html body .rk-contents-menu button.rk-contents-chapter::before{content:'↳';position:absolute;left:12px;opacity:.7}

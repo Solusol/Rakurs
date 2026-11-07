@@ -225,7 +225,7 @@ function openVersions(){ if(!curPage) return; $('#verPreview').hidden=true; $('#
 function renderVersions(){
   const list=versionsOf(curPage.id); const el=$('#verListItems'); const cur=pageBlocks(curPage).filter(b=>!b.deleted); const curC=cur.reduce((a,b)=>a+blockText(b.h).length,0);
   $('#verNow').textContent=`Сейчас: ${cur.length} абз. · ${curC.toLocaleString('ru')} зн.`;
-  if(!list.length){ el.innerHTML='<div class="muted">Версий этой страницы пока нет. Они появляются сами, когда ты выходишь из правки, и по кнопке «Сохранить версию».</div>'; return; }
+  if(!list.length){ el.innerHTML=''; return; }
   el.innerHTML=[...list].map((v,i)=>({v,i})).reverse().map(({v,i})=>`<div class="ver"><div class="vt"><b>${esc(v.name||(v.auto?'Автосохранение':'Версия'))}</b><small>${fmtDate(v.ts)} · ${v.n} абз. · ${(v.c||0).toLocaleString('ru')} зн.${v.c!=null?` (${v.c-curC>=0?'+':''}${(v.c-curC).toLocaleString('ru')} к текущей)`:''}</small></div><button class="btn" data-a="view" data-i="${i}">Посмотреть</button><button class="btn" data-a="restore" data-i="${i}">Восстановить</button><button class="icon-btn" data-a="del" data-i="${i}" title="Удалить версию">✕</button></div>`).join('');
   el.onclick=e=>{ const b=e.target.closest('button[data-a]'); if(!b) return; const i=+b.dataset.i; if(b.dataset.a==='restore'){ if(!b.dataset.armed){ b.dataset.armed='1'; b.textContent='Точно? Ещё раз'; setTimeout(()=>{ b.dataset.armed=''; b.textContent='Восстановить'; },3000); return; } restoreVersion(i); } else if(b.dataset.a==='del') deleteVersion(i); else previewVersion(i); };
 }
@@ -1934,8 +1934,8 @@ function init(){
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') hidePopmenus(); });
   $('#btnExport').onclick=openExport; $('#exRun').onclick=runExport;
   $('#exPresets').addEventListener('click', e=>{ const c=e.target.closest('.chip'); if(c) applyPreset(c.dataset.preset); });
-  document.addEventListener('click', e=>{ const b=e.target.closest&&e.target.closest('[data-ws-dup],[data-ws-del]'); if(!b) return; e.preventDefault(); e.stopPropagation(); if(b.dataset.wsDup) wsDuplicate(b.dataset.wsDup); else wsDelete(b.dataset.wsDel); }, true);
-  document.addEventListener('mousedown', e=>{ if(e.target.closest&&e.target.closest('[data-ws-dup],[data-ws-del]')) e.stopPropagation(); }, true);
+  document.addEventListener('click', e=>{ const b=e.target.closest&&e.target.closest('[data-ws-dup],[data-ws-del],[data-toc-fold]'); if(!b) return; e.preventDefault(); e.stopPropagation(); if(b.dataset.wsDup) wsDuplicate(b.dataset.wsDup); else if(b.dataset.wsDel) wsDelete(b.dataset.wsDel); else tocToggleFold(b.dataset.tocFold); }, true);
+  document.addEventListener('mousedown', e=>{ if(e.target.closest&&e.target.closest('[data-ws-dup],[data-ws-del],[data-toc-fold]')) e.stopPropagation(); }, true);
   $('#exScopeList').addEventListener('change', e=>{ const i=e.target; if(i&&i.name==='exs'&&PAGE[i.value]&&wsType(PAGE[i.value])==='folder'){ $$('#exScopeList input[name=exs]').forEach(o=>{ if(o!==i&&wsDescendant(o.value,i.value)) o.checked=i.checked; }); } exSyncAll(); $$('#exPresets .chip').forEach(c=>c.classList.remove('on')); $('#exPresetHint').textContent=''; });
   $('#exScopeList').addEventListener('click', e=>{ if(e.target.id!=='exScopeAll') return; const all=$$('#exScopeList input[name=exs]'); const on=!all.every(i=>i.checked); all.forEach(i=>i.checked=on); exSyncAll(); $$('#exPresets .chip').forEach(c=>c.classList.remove('on')); $('#exPresetHint').textContent=''; });
   $('#betaCopy').onclick=()=>{ if(!curPage||curPage.special) return; const html=exportHTML([curPage], {content:$('#betaNotes').checked?'both':'text', fmt:'html', mark:false, orig:false}); const ok=download(new Blob([html],{type:'text/html;charset=utf-8'}), `${slug(curPage.title)}-beta.html`); toast(ok?'Файл с главой скачан — его можно отправить бета‑ридеру':'Скачивание не удалось'); };
@@ -2129,16 +2129,23 @@ function wsPath(p){ const seen=new Set(); const out=[]; let par=wsParent(p); whi
 function wsCrumbs(p){ return '<nav class="ws-crumbs"><a href="#/">'+esc(CUR_PROJ.name)+'</a>'+wsPath(p).map(x=>' / <a href="#/'+x.id+'">'+esc(x.title)+'</a>').join('')+'</nav>'; }
 function wsCommit(){ save(); flush(); return storageOK&&lastWriteOK; }
 function isEmptyData(d){ return isEmptyDataLegacy(d)&&!((d.workspace||{}).cover); }
+function tocFolded(){ if(!Array.isArray(prefs.tocFolded)) prefs.tocFolded=[]; return prefs.tocFolded; }
+function tocToggleFold(id){ const f=tocFolded(); const i=f.indexOf(id); if(i>=0) f.splice(i,1); else f.push(id); savePrefs(); buildToc(); }
 function buildToc(){
  const toc=$('#toc'); toc.innerHTML='';
  const home=document.createElement('a'); home.href='#/'; home.className='ws-toc-home'; home.textContent=CUR_PROJ.name; toc.appendChild(home);
+ const folded=new Set(tocFolded().filter(id=>PAGE[id]));
+ if(curPage&&wsUser(curPage)) wsPath(curPage).forEach(anc=>folded.delete(anc.id));
+ prefs.tocFolded=[...folded];
  function branch(parent,depth,seen){
   wsChildren(parent).forEach(p=>{
    if(seen.has(p.id)) return; const next=new Set(seen); next.add(p.id);
    const a=document.createElement('a'); a.href='#/'+p.id; a.dataset.page=p.id;
    a.style.paddingLeft=(12+depth*14)+'px';a.dataset.wsReorder=p.id;a.draggable=!tabReadOnly;
-   a.innerHTML='<span class="t"><small class="ws-type">'+esc(wsLabel(p))+'</small>'+esc(p.title)+'</span>'+wsActButtons(p)+'<span class="badges"></span>';
-   toc.appendChild(a); if(wsType(p)==='folder') branch(p.id,depth+1,next);
+   const isFolder=wsType(p)==='folder', open=isFolder&&!folded.has(p.id);
+   const fold=isFolder?'<button type="button" class="toc-fold" data-toc-fold="'+esc(p.id)+'" aria-expanded="'+open+'" title="'+(open?'Свернуть папку':'Развернуть папку')+'" aria-label="'+(open?'Свернуть папку':'Развернуть папку')+'"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 10l5 5 5-5"/></svg></button>':'';
+   a.innerHTML='<span class="t"><small class="ws-type">'+esc(wsLabel(p))+'</small>'+esc(p.title)+'</span>'+wsActButtons(p)+fold+'<span class="badges"></span>';
+   toc.appendChild(a); if(isFolder&&open) branch(p.id,depth+1,next);
   });
  }
  branch('',0,new Set());
@@ -2324,7 +2331,7 @@ function rkContents(p,host,side){
  function populate(){
   menu.replaceChildren();const ordered=[],seen=new Set();
   const book=wsBook(p); ordered.push(book); wsChapters(book).forEach(ch=>{if(!seen.has(ch.id)){seen.add(ch.id);ordered.push(ch);}});
-  ordered.forEach(ch=>{const b=document.createElement('button');b.type='button';b.textContent=ch.title;b.dataset.chapter=ch.id;if(ch.id===p.id)b.setAttribute('aria-current','page');b.onclick=()=>{menu.hidden=true;button.setAttribute('aria-expanded','false');if(side){prefs.split=ch.id;savePrefs();renderPane();}else nav('#/'+ch.id);};menu.appendChild(b);});
+  ordered.forEach(ch=>{const b=document.createElement('button');b.type='button';b.textContent=ch.title;b.dataset.chapter=ch.id;b.className=ch===book?'rk-contents-book':'rk-contents-chapter';if(ch.id===p.id)b.setAttribute('aria-current','page');b.onclick=()=>{menu.hidden=true;button.setAttribute('aria-expanded','false');if(side){prefs.split=ch.id;savePrefs();renderPane();}else nav('#/'+ch.id);};menu.appendChild(b);});
   const add=document.createElement('button');add.type='button';add.className='rk-add-chapter';add.textContent='Добавить главу';add.onclick=()=>{menu.hidden=true;button.setAttribute('aria-expanded','false');rkAddChapter(wsBook(p).id);};menu.appendChild(add);
  }
  button.onclick=()=>{const opening=menu.hidden;if(opening)populate();menu.hidden=!opening;button.setAttribute('aria-expanded',String(opening));if(opening)menu.querySelector('button')?.focus();};
