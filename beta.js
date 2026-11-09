@@ -9,6 +9,7 @@
 const BETA_RE=/^#\/beta\/([0-9a-f-]{36})/i;
 const betaMatch=location.hash.match(BETA_RE);
 if(betaMatch) window.RK_BETA_MODE=true;
+const pageNoteStyle=document.createElement('style');pageNoteStyle.id='rk-hide-page-note';pageNoteStyle.textContent='html body :is(#view,#view2Body,#rkBetaView) .page-note{display:none!important}';document.head.appendChild(pageNoteStyle);
 
 const esc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const sb=()=>window.RK_CLOUD&&RK_CLOUD.enabled?RK_CLOUD.client:null;
@@ -34,14 +35,18 @@ const CSS=`
 .rk-comment-settings button{box-sizing:border-box!important;transform:none!important;border-width:1px!important}
 .rk-comment-settings button:focus-visible,.rk-comment-settings input:focus-visible{outline:2px solid var(--text)!important;outline-offset:3px}
 @media(min-width:1050px){
-body:not(.mode-edit) .rk-bc-sideview{max-width:1600px!important}
-body:not(.mode-edit) .rk-bc-sideview .blocks>.blk{display:grid!important;grid-template-columns:minmax(0,1fr) 300px;column-gap:24px;align-items:start}
-body:not(.mode-edit) .rk-bc-sideview .blocks>.blk>.body{grid-column:1;grid-row:1;min-width:0}
-body:not(.mode-edit) .rk-bc-sideview .blocks>.blk>.rk-bc-slot,
-body:not(.mode-edit) .rk-bc-sideview .blocks>.blk>.noteslot{grid-column:2;min-width:0}
-body:not(.mode-edit) .rk-bc-sideview .blocks>.blk>.rk-bc-slot{grid-row:1;margin-top:0}
-body:not(.mode-edit) .rk-bc-sideview .blocks>.blk>.noteslot:empty{display:none}
-body:not(.mode-edit) .rk-bc-sideview .rk-bc-thread{min-width:0;overflow-wrap:anywhere}
+html body:not(.mode-edit) .rk-bc-sideview{position:relative!important;max-width:1600px!important;overflow:visible!important;--rk-comment-width:300px;--rk-comment-gap:24px}
+html body:not(.mode-edit) .rk-bc-sideview .blocks{position:static!important;width:calc(100% - var(--rk-comment-width) - var(--rk-comment-gap))!important;max-width:none!important;box-sizing:border-box!important;margin-inline:0!important}
+html body:not(.mode-edit) .rk-bc-sideview .blocks>.blk{display:block!important;position:static!important;min-height:0!important;grid-template-columns:none!important}
+html body:not(.mode-edit) .rk-bc-sideview .blocks>.blk>.body{min-width:0;grid-column:auto!important;grid-row:auto!important}
+html body:not(.mode-edit) .rk-bc-sideview .rk-bc-slot,
+html body:not(.mode-edit) .rk-bc-sideview .rk-bc-general{display:contents!important;position:static!important}
+html body:not(.mode-edit) .rk-bc-sideview .rk-bc-slot>.rk-bc-thread,
+html body:not(.mode-edit) .rk-bc-sideview .rk-bc-general>.rk-bc-thread,
+html body:not(.mode-edit) .rk-bc-sideview .rk-bc-slot>.rk-bc-compose,
+html body:not(.mode-edit) .rk-bc-sideview .rk-bc-general>.rk-bc-compose{position:absolute!important;top:var(--rk-comment-top,0px)!important;right:var(--rk-page-pad,28px)!important;left:auto!important;width:var(--rk-comment-width)!important;box-sizing:border-box!important;margin:0!important;min-width:0;overflow-wrap:anywhere;z-index:2}
+html body:not(.mode-edit) .rk-bc-sideview .blocks>.blk>.noteslot:has(>.rk-bc-slot){position:static!important}
+html body:not(.mode-edit) .rk-bc-sideview::after{content:'';display:block;height:var(--rk-comment-tail,0px);pointer-events:none}
 }
 .rk-bc-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 16px;font-family:var(--hand);font-size:15px}
 .rk-bc-bar .rk-bc-title{letter-spacing:.1em;text-transform:uppercase;font-size:13px;color:var(--muted);margin-right:4px}
@@ -167,12 +172,86 @@ function composer(opts){
 }
 const commentControls=new WeakMap();
 function commentPreferenceKey(){return 'rk:comments-layout:v1:'+(user()?.id||'local')+':'+(betaMatch?betaMatch[1]:'author');}
+const commentLayouts=new Map();
+let commentLayoutFrame=0;
+let activeCommentId='';
+const commentObserved=new Set();
+const commentResize=window.ResizeObserver?new ResizeObserver(scheduleCommentLayouts):null;
+function scheduleCommentLayouts(){
+  if(!commentLayoutFrame)commentLayoutFrame=requestAnimationFrame(()=>{commentLayoutFrame=0;updateCommentLayouts();});
+}
 function applyCommentLayout(bar,state){
   requestAnimationFrame(()=>{
     const host=bar.closest('.view,#view2Body');
-    if(host)host.classList.toggle('rk-bc-sideview',state.commentLayout==='side');
+    if(host){commentLayouts.set(host,{bar,state});scheduleCommentLayouts();}
   });
 }
+function packCommentCards(items,activeId,viewportTop,textBottom){
+  let bottom=0;
+  return items.map(item=>{
+    let target=item.anchor;
+    if(item.id===activeId)target=Math.max(target,Math.min(viewportTop,Math.max(target,textBottom-item.height)));
+    const top=Math.max(0,target,bottom);
+    bottom=top+item.height+12;
+    return {...item,top};
+  });
+}
+function updateCommentLayouts(){
+  const observe=new Set();
+  for(const [host,entry] of commentLayouts){
+    if(!host.isConnected||!entry.bar.isConnected){
+      host.classList.remove('rk-bc-sideview');host.style.removeProperty('--rk-comment-tail');commentLayouts.delete(host);continue;
+    }
+    const blocks=host.querySelector('.blocks');
+    const cards=[...host.querySelectorAll('.rk-bc-slot > .rk-bc-thread,.rk-bc-general > .rk-bc-thread,.rk-bc-slot > .rk-bc-compose,.rk-bc-general > .rk-bc-compose')];
+    const enabled=entry.state.commentLayout==='side'&&!!blocks&&cards.length>0&&!document.body.classList.contains('mode-edit')&&host.clientWidth>=760&&window.innerWidth>=1050;
+    host.classList.toggle('rk-bc-sideview',enabled);
+    if(!enabled){host.style.removeProperty('--rk-comment-tail');continue;}
+    observe.add(host);observe.add(blocks);
+    const rect=host.getBoundingClientRect();
+    const origin=rect.top+host.clientTop-host.scrollTop;
+    const marks=new Map();
+    host.querySelectorAll('mark.rk-bc-mark[data-bc]').forEach(m=>{if(!marks.has(m.dataset.bc))marks.set(m.dataset.bc,m);});
+    const topBar=document.querySelector(document.body.classList.contains('rk-beta-mode')?'.rk-beta-bar':'.bar');
+    const barBottom=topBar?Math.max(0,topBar.getBoundingClientRect().bottom):0;
+    const textBottom=blocks.getBoundingClientRect().bottom-origin;
+    const items=cards.map((card,index)=>{
+      observe.add(card);
+      const id=card.dataset.id||'compose-'+index;
+      const anchor=marks.get(id)||card.closest('.blk')?.querySelector(':scope > .body')||blocks;
+      return {card,id,index,anchor:Math.max(0,anchor.getBoundingClientRect().top-origin),height:card.getBoundingClientRect().height};
+    }).sort((a,b)=>a.anchor-b.anchor||a.index-b.index);
+    const packed=packCommentCards(items,activeCommentId,barBottom+12-origin,textBottom);
+    let last=textBottom;
+    packed.forEach(item=>{
+      const value=item.top.toFixed(2)+'px';
+      if(item.card.style.getPropertyValue('--rk-comment-top')!==value)item.card.style.setProperty('--rk-comment-top',value);
+      last=Math.max(last,item.top+item.height);
+    });
+    const tail=Math.max(0,last-textBottom+12).toFixed(2)+'px';
+    if(host.style.getPropertyValue('--rk-comment-tail')!==tail)host.style.setProperty('--rk-comment-tail',tail);
+  }
+  if(commentResize){
+    commentObserved.forEach(el=>{if(!observe.has(el)){commentResize.unobserve(el);commentObserved.delete(el);}});
+    observe.forEach(el=>{if(!commentObserved.has(el)){commentObserved.add(el);commentResize.observe(el);}});
+  }
+}
+function selectCommentLayoutTarget(e){
+  const target=e.target instanceof Element?e.target:null;
+  const mark=target?.closest('mark.rk-bc-mark');
+  const card=target?.closest('.rk-bc-thread');
+  if(mark||card){activeCommentId=mark?.dataset.bc||card.dataset.id;scheduleCommentLayouts();}
+}
+document.addEventListener('pointerdown',selectCommentLayoutTarget,true);
+document.addEventListener('focusin',selectCommentLayoutTarget,true);
+document.addEventListener('scroll',scheduleCommentLayouts,{capture:true,passive:true});
+window.addEventListener('resize',scheduleCommentLayouts,{passive:true});
+window.addEventListener('hashchange',()=>{activeCommentId='';scheduleCommentLayouts();});
+document.addEventListener('change',scheduleCommentLayouts);
+document.addEventListener('load',scheduleCommentLayouts,true);
+new MutationObserver(scheduleCommentLayouts).observe(document.body,{childList:true,subtree:true,characterData:true});
+new MutationObserver(scheduleCommentLayouts).observe(document.body,{attributes:true,attributeFilter:['class','data-font','data-ui','data-theme','data-palette','data-rk-mode','data-rk-palette']});
+if(document.fonts?.ready)document.fonts.ready.then(scheduleCommentLayouts);
 function filterBar(state,onChange,extra){
   if(!state.commentLayout){try{state.commentLayout=localStorage.getItem(commentPreferenceKey())==='side'?'side':'bottom';}catch(e){state.commentLayout='bottom';}}
   const bar=document.createElement('div');bar.className='rk-bc-bar';bar.contentEditable='false';
