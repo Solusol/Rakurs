@@ -17,3 +17,53 @@ html body.ws-block-dnd #view .ws-block-append {
   outline-offset: 3px !important;
   box-shadow: none !important;
 }
+
+/* Resolve the comment palette on body, before reader backgrounds override it. */
+html body {
+  --rk-comment-bg: var(--rk-bg, var(--bg, #262626));
+  --rk-comment-fg: var(--rk-text, var(--text, #E5E0CF));
+  --rk-comment-edge: color-mix(in srgb, var(--rk-text, var(--text, #E5E0CF)) 45%, var(--rk-bg, var(--bg, #262626)));
+}
+html:root body :is(#view,#view2Body,#rkBetaView) :is(.rk-bc-thread.rk-bc-thread.rk-bc-thread,.noteslot .note.note.note) {
+  background: var(--rk-comment-bg) !important;
+  color: var(--rk-comment-fg) !important;
+  --rk-text: var(--rk-comment-fg) !important;
+  --text: var(--rk-comment-fg) !important;
+  --paper-text: var(--rk-comment-fg) !important;
+  border-top-color: var(--rk-comment-edge) !important;
+  border-right-color: var(--rk-comment-edge) !important;
+  border-bottom-color: var(--rk-comment-edge) !important;
+  opacity: 1 !important;
+}
+html:root body :is(#view,#view2Body,#rkBetaView) :is(.rk-bc-thread.rk-bc-thread.rk-bc-thread,.noteslot .note.note.note) :is(.rk-bc-text,.rk-bc-q,.rk-bc-when,.rk-bc-who,.q,.meta,.txt,.link) {
+  color: var(--rk-comment-fg) !important;
+  opacity: 1 !important;
+}
+html:root body :is(#view,#view2Body,#rkBetaView) :is(.rk-bc-thread.rk-bc-thread.rk-bc-thread,.noteslot .note.note.note) :is(textarea,select,input) {
+  background: var(--rk-comment-bg) !important;
+  color: var(--rk-comment-fg) !important;
+  caret-color: var(--rk-comment-fg) !important;
+  border-color: var(--rk-comment-edge) !important;
+}
+html:root body :is(#view,#view2Body,#rkBetaView) :is(.rk-bc-thread.rk-bc-thread.rk-bc-thread,.noteslot .note.note.note) textarea::placeholder {
+  color: var(--rk-comment-fg) !important;
+  opacity: .75 !important;
+}
+html:root body :is(#view,#view2Body,#rkBetaView) :is(.rk-bc-thread.rk-bc-thread.rk-bc-thread,.noteslot .note.note.note) button {
+  background: var(--rk-comment-bg) !important;
+  color: var(--rk-comment-fg) !important;
+  border-color: var(--rk-comment-edge) !important;
+  opacity: 1 !important;
+}
+html:root body :is(#view,#view2Body,#rkBetaView) :is(.rk-bc-thread.rk-bc-thread.rk-bc-thread,.noteslot .note.note.note) button:hover {
+  text-decoration: underline !important;
+  text-underline-offset: 3px;
+}
+html:root body :is(#view,#view2Body,#rkBetaView) :is(.rk-bc-thread.rk-bc-thread.rk-bc-thread,.noteslot .note.note.note) button.primary {
+  background: var(--rk-comment-fg) !important;
+  color: var(--rk-comment-bg) !important;
+}
+html:root body :is(#view,#view2Body,#rkBetaView) :is(.rk-bc-thread.rk-bc-thread.rk-bc-thread,.noteslot .note.note.note) :is(button,textarea,select,input):focus-visible {
+  outline: 2px solid var(--rk-comment-fg) !important;
+  outline-offset: 2px;
+}
