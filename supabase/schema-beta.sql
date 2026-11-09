@@ -1,3 +1,4 @@
+begin;
 -- Ракурс · доступ для беты: ссылки на главы, копии глав и комментарии.
 -- Выполнить один раз в Supabase → SQL Editor (после schema.sql).
 
@@ -180,3 +181,167 @@ create trigger rk_shares_touch before update on public.rk_shares
 drop trigger if exists rk_chapters_touch on public.rk_chapters;
 create trigger rk_chapters_touch before update on public.rk_chapters
   for each row execute function public.rk_touch();
+-- Сохраняем ответы при удалении родительского комментария.
+alter table public.rk_comments
+  drop constraint if exists rk_comments_parent_id_fkey;
+
+alter table public.rk_comments
+  add constraint rk_comments_parent_id_fkey
+  foreign key (parent_id)
+  references public.rk_comments(id)
+  on delete set null;
+
+-- Проверяем главу, владельца и принадлежность ответа той же ветке.
+create or replace function public.rk_comments_insert_guard()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  s public.rk_shares;
+begin
+  select * into s
+  from public.rk_shares
+  where id = new.share_id;
+
+  if not found then
+    raise exception 'Ссылка для беты не найдена';
+  end if;
+
+  if new.owner_id is distinct from s.owner_id
+     or not coalesce(new.page_id = any(s.chapters), false) then
+    raise exception 'Глава не включена в эту ссылку';
+  end if;
+
+  if new.parent_id is not null then
+    perform 1
+    from public.rk_comments p
+    where p.id = new.parent_id
+      and p.share_id = new.share_id
+      and p.owner_id = new.owner_id
+      and p.page_id = new.page_id;
+
+    if not found then
+      raise exception 'Ответ должен относиться к той же ссылке и главе';
+    end if;
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists rk_comments_insert_guard
+  on public.rk_comments;
+
+create trigger rk_comments_insert_guard
+before insert on public.rk_comments
+for each row
+execute function public.rk_comments_insert_guard();
+
+-- Автор управляет комментариями своей истории.
+-- Бета меняет и удаляет только свои комментарии
+-- и только пока доступ к соответствующей главе активен.
+drop policy if exists "rk_comments_update"
+  on public.rk_comments;
+
+create policy "rk_comments_update"
+on public.rk_comments
+for update to authenticated
+using (
+  auth.uid() = owner_id
+  or (
+    auth.uid() = author_id
+    and exists (
+      select 1
+      from public.rk_shares s
+      where s.id = rk_comments.share_id
+        and s.owner_id = rk_comments.owner_id
+        and rk_comments.page_id = any(s.chapters)
+        and public.rk_share_is_mine(s)
+    )
+  )
+)
+with check (
+  auth.uid() = owner_id
+  or (
+    auth.uid() = author_id
+    and exists (
+      select 1
+      from public.rk_shares s
+      where s.id = rk_comments.share_id
+        and s.owner_id = rk_comments.owner_id
+        and rk_comments.page_id = any(s.chapters)
+        and public.rk_share_is_mine(s)
+    )
+  )
+);
+
+drop policy if exists "rk_comments_delete"
+  on public.rk_comments;
+
+create policy "rk_comments_delete"
+on public.rk_comments
+for delete to authenticated
+using (
+  auth.uid() = owner_id
+  or (
+    auth.uid() = author_id
+    and exists (
+      select 1
+      from public.rk_shares s
+      where s.id = rk_comments.share_id
+        and s.owner_id = rk_comments.owner_id
+        and rk_comments.page_id = any(s.chapters)
+        and public.rk_share_is_mine(s)
+    )
+  )
+);
+
+-- Разрешаем очищать parent_id при удалении родителя,
+-- но запрещаем произвольно переносить комментарий в другую ветку.
+create or replace function public.rk_comments_guard()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.share_id := old.share_id;
+  new.owner_id := old.owner_id;
+  new.page_id := old.page_id;
+
+  if new.parent_id is distinct from old.parent_id then
+    if not (
+      new.parent_id is null
+      and old.parent_id is not null
+      and not exists (
+        select 1 from public.rk_comments
+        where id = old.parent_id
+      )
+    ) then
+      new.parent_id := old.parent_id;
+    end if;
+  end if;
+
+  new.role := old.role;
+  new.author_id := old.author_id;
+  new.author_name := old.author_name;
+  new.created_at := old.created_at;
+
+  if auth.uid() is distinct from old.owner_id then
+    new.done := old.done;
+  end if;
+
+  if auth.uid() is distinct from old.author_id then
+    new.body := old.body;
+    new.quote := old.quote;
+    new.block_id := old.block_id;
+    new.o1 := old.o1;
+    new.o2 := old.o2;
+  end if;
+
+  new.updated_at := now();
+  return new;
+end;
+$$;
+
+commit;

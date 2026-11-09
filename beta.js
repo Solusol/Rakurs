@@ -344,7 +344,109 @@ function betaScreen(shareId){
   let share=null, chapters=[], cur=null, comments=[]; const state={filter:'all',showDone:false,doneCount:0};
   const me=()=>user();
   const center=(title,text,btn)=>{ root.innerHTML=`<div class="rk-beta-center"><h1>${esc(title)}</h1>${text?`<p>${text}</p>`:''}${btn?`<button type="button" class="btn primary" id="rkBetaAction">${esc(btn.label)}</button>`:''}</div>`; if(btn) root.querySelector('#rkBetaAction').onclick=btn.fn; };
-  function applyLook(){ const l=share.look||{}; const b=document.body; if(l.palette&&l.palette!=='rust') b.dataset.palette=l.palette; else delete b.dataset.palette; if(l.font) b.dataset.font=l.font; if(l.ui&&l.ui!=='beer') b.dataset.ui=l.ui; else delete b.dataset.ui; const LOGOS=window.LIMB_LOGOS; if(LOGOS){ const fav=document.querySelector('link[rel="icon"][type="image/svg+xml"]'); const src=LOGOS[l.palette]||LOGOS.base; if(fav&&src) fav.href=src; } }
+
+  const TEXT_FONTS = [
+    ['literata','Literata','Literata'], ['roboto','Roboto Serif','Roboto Serif'],
+    ['bitter','Bitter','Bitter'], ['didact','Didact Gothic','Didact Gothic'],
+    ['comfortaa','Comfortaa','Comfortaa'], ['badscript','Bad Script','Bad Script'],
+    ['amatic','Amatic SC','Amatic SC'], ['beer','Beer Money','Beer Money'],
+    ['ftw','First Time Writing','First Time Writing']
+  ];
+  const UI_FONTS = [
+    ['beer','Beer Money','Beer Money'], ['boozy','Boozy','Boozy'],
+    ['angst','Angst','Angst'], ['bicubik','Bicubik','Bicubik'],
+    ['druzhok','Druzhok','Druzhok'], ['amatic','Amatic SC','Amatic SC'],
+    ['badscript','Bad Script','Bad Script'], ['ftw','First Time Writing','First Time Writing'],
+    ['comfortaa','Comfortaa','Comfortaa']
+  ];
+  let readerLook=null;
+  function appearanceKey(){ return 'rk:beta-appearance:v1:'+me().id+':'+shareId; }
+  function cleanLook(value){
+    const l=value&&typeof value==='object'?value:{};
+    return {
+      palette:['base','indigo','terra'].includes(l.palette)?l.palette:'base',
+      theme:l.theme==='light'?'light':'dark',
+      font:TEXT_FONTS.some(f=>f[0]===l.font)?l.font:'literata',
+      ui:UI_FONTS.some(f=>f[0]===l.ui)?l.ui:'beer'
+    };
+  }
+  function authorLook(){ return cleanLook(share.look||{}); }
+  function currentLook(){ return cleanLook(readerLook||authorLook()); }
+  function loadReaderLook(){
+    try{const raw=localStorage.getItem(appearanceKey());readerLook=raw?cleanLook(JSON.parse(raw)):null;}
+    catch(e){readerLook=null;}
+  }
+  function applyLook(value){
+    const l=cleanLook(value||currentLook()),b=document.body;
+    b.dataset.palette=l.palette;b.dataset.theme=l.theme;
+    b.dataset.font=l.font;b.dataset.ui=l.ui;
+    const fav=document.querySelector('link[rel="icon"][type="image/svg+xml"]');
+    if(window.LIMB_LOGOS&&fav) fav.href=LIMB_LOGOS[l.palette]||LIMB_LOGOS.base;
+    const button=root.querySelector('#rkBetaTheme');
+    if(button){button.title=l.theme==='dark'?'Включить светлую тему':'Включить тёмную тему';button.setAttribute('aria-label',button.title);}
+  }
+  function saveReaderLook(value){
+    if(value===null){localStorage.removeItem(appearanceKey());readerLook=null;}
+    else{const next=cleanLook(value);localStorage.setItem(appearanceKey(),JSON.stringify(next));readerLook=next;}
+    applyLook();
+  }
+  function openReaderLook(){
+    if(document.getElementById('rkBetaLook'))return;
+    const before=currentLook(),previousFocus=document.activeElement;
+    let draft={...before},inherit=readerLook===null;
+    const modal=document.createElement('div');
+    modal.id='rkBetaLook';modal.className='modal look';
+    modal.setAttribute('role','dialog');modal.setAttribute('aria-modal','true');
+    modal.setAttribute('aria-labelledby','rkBetaLookTitle');
+    const fonts=(name,list)=>`<div class="tiles">${list.map(([id,label,family])=>`
+      <label class="tile"><input type="radio" name="${name}" value="${id}">
+      <span class="fs" style="font-family:'${family}'">Аа Бб</span>
+      <span>${esc(label)}</span></label>`).join('')}</div>`;
+    modal.innerHTML=`<div class="dlgbox">
+      <div class="dlgbox-head"><h3 id="rkBetaLookTitle">Настройки чтения</h3>
+      <button type="button" class="icon-btn" data-close aria-label="Закрыть">✕</button></div>
+      <div class="dlgbox-body"><p class="muted">Только твоё отображение. Текст и оформление автора не меняются.</p>
+      <div class="field"><label>Цветовая палитра</label><div class="tiles">
+      ${[['base','Основная'],['indigo','Индиго'],['terra','Терракота']].map(([id,label])=>`
+      <label class="tile"><input type="radio" name="palette" value="${id}">
+      <span class="sw">${PALETTES[id].map(c=>`<i style="background:${c}"></i>`).join('')}</span>
+      <span>${label}</span></label>`).join('')}</div></div>
+      <div class="field"><label>Тема</label><div class="radios">
+      <label><input type="radio" name="theme" value="dark"> Тёмная</label>
+      <label><input type="radio" name="theme" value="light"> Светлая</label></div></div>
+      <div class="field"><label>Шрифт текста</label>${fonts('font',TEXT_FONTS)}</div>
+      <div class="field"><label>Шрифт заголовков и кнопок</label>${fonts('ui',UI_FONTS)}</div>
+      <p class="muted" data-message role="status"></p></div>
+      <div class="dlgbox-foot"><button type="button" class="btn primary" data-save>Сохранить</button>
+      <button type="button" class="btn" data-close>Отмена</button>
+      <button type="button" class="btn" data-reset>Как у автора</button></div></div>`;
+    function sync(){modal.querySelectorAll('input[type=radio]').forEach(i=>{i.checked=draft[i.name]===i.value;});}
+    function close(saved){
+      document.removeEventListener('keydown',onKey,true);modal.remove();
+      if(!saved)applyLook(before);
+      if(previousFocus&&previousFocus.isConnected)previousFocus.focus();
+    }
+    function onKey(e){
+      if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close(false);return;}
+      if(e.key!=='Tab')return;
+      const controls=[...modal.querySelectorAll('button:not([disabled]),input:checked')];
+      const first=controls[0],last=controls[controls.length-1];
+      if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+      else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+    }
+    modal.addEventListener('change',e=>{
+      const i=e.target;if(!i.matches('input[type=radio]'))return;
+      draft[i.name]=i.value;inherit=false;applyLook(draft);
+    });
+    modal.addEventListener('click',e=>{if(e.target===modal||e.target.closest('[data-close]'))close(false);});
+    modal.querySelector('[data-reset]').onclick=()=>{draft=authorLook();inherit=true;sync();applyLook(draft);};
+    modal.querySelector('[data-save]').onclick=()=>{
+      try{saveReaderLook(inherit?null:draft);close(true);toast('Настройки чтения сохранены на этом устройстве');}
+      catch(e){modal.querySelector('[data-message]').textContent='Браузер не разрешил сохранить настройки. Сейчас действует только предпросмотр.';}
+    };
+    document.body.appendChild(modal);sync();document.addEventListener('keydown',onKey,true);
+    modal.querySelector('[data-close]').focus();
+  }
   async function start(){
     if(!sb()){ center('Ракурс','Облако не настроено — ссылка для беты не работает.'); return; }
     if(!me()){ center('Доступ для беты','Это ссылка на главы для вычитки. Войди в аккаунт «Ракурса» с той почтой, на которую автор выдал доступ.',{label:'Войти',fn:()=>RK_CLOUD.openDialog('login')}); RK_CLOUD.onLoginFresh=()=>location.reload(); return; }
@@ -353,7 +455,7 @@ function betaScreen(shareId){
       await sb().rpc('rk_accept_share',{sid:shareId});
       const {data,error}=await sb().from('rk_shares').select('*').eq('id',shareId).maybeSingle(); if(error) throw error;
       if(!data){ center('Ссылка недоступна',`Она отключена автором или выдана другой почте. Ты вошла как <b>${esc(me().email||'')}</b>.`,{label:'Выйти',fn:async()=>{ await sb().auth.signOut(); location.reload(); }}); return; }
-      share=data; applyLook();
+      share=data; loadReaderLook(); applyLook();
       const {data:rows,error:e2}=await sb().from('rk_chapters').select('page_id,title,data,updated').eq('owner_id',share.owner_id).eq('project_id',share.project_id).in('page_id',share.chapters||[]); if(e2) throw e2;
       const order=share.chapters||[]; chapters=(rows||[]).map(r=>{ let d={}; try{ d=JSON.parse(r.data)||{}; }catch(e){} return {id:r.page_id,title:r.title||d.title||'Глава',sub:d.sub||'',blocks:d.blocks||[]}; }).sort((a,b)=>order.indexOf(a.id)-order.indexOf(b.id));
       if(!chapters.length){ center(share.book_title||'Ракурс','Автор ещё не отправил текст глав — попроси открыть эти главы в приложении.'); return; }
@@ -366,7 +468,16 @@ function betaScreen(shareId){
   function shell(){
     root.innerHTML=`<header class="rk-beta-bar"><div class="rk-beta-bar-in"><span class="rk-beta-brand">Ракурс</span><span class="rk-beta-book">${esc(share.book_title||'')}</span><select id="rkBetaChapter" aria-label="Глава">${chapters.map(c=>`<option value="${esc(c.id)}">${esc(c.title)}</option>`).join('')}</select><span class="rk-beta-readonly">Чтение и комментарии</span><span class="sp"></span><button type="button" class="icon-btn" id="rkBetaTheme" title="Тема"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6l1.4 1.4M17 17l1.4 1.4M5.6 18.4L7 17M17 7l1.4-1.4"/></svg></button><span class="rk-beta-user">${esc(me().email||'')}</span><button type="button" class="link-btn" id="rkBetaOut">Выйти</button></div></header><main class="rk-beta-main"><div class="view" id="rkBetaView"></div></main>`;
     root.querySelector('#rkBetaChapter').onchange=e=>{ const c=chapters.find(x=>x.id===e.target.value); if(c) show(c); };
-    root.querySelector('#rkBetaTheme').onclick=()=>{ const b=document.getElementById('btnTheme'); if(b) b.click(); };
+    const themeButton=root.querySelector('#rkBetaTheme');
+    themeButton.onclick=()=>{
+      if(document.getElementById('rkBetaLook'))return;
+      const next=currentLook();next.theme=next.theme==='dark'?'light':'dark';
+      try{saveReaderLook(next);}catch(e){toast('Браузер не разрешил сохранить настройку темы');}
+    };
+    const appearanceButton=document.createElement('button');
+    appearanceButton.type='button';appearanceButton.className='btn';
+    appearanceButton.id='rkBetaAppearance';appearanceButton.textContent='Оформление';
+    appearanceButton.onclick=openReaderLook;themeButton.before(appearanceButton);applyLook();
     root.querySelector('#rkBetaOut').onclick=async()=>{ await sb().auth.signOut(); location.reload(); };
     const bubble=document.createElement('button'); bubble.id='rkBetaBubble'; bubble.type='button'; bubble.textContent='Комментировать'; bubble.hidden=true; bubble.addEventListener('mousedown',e=>e.preventDefault()); document.body.appendChild(bubble);
     let pending=null, selT=null;
