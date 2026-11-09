@@ -24,6 +24,25 @@ async function copyText(t){ try{ await navigator.clipboard.writeText(t); return 
 
 /* ---------- стили (общие для автора и беты) ---------- */
 const CSS=`
+
+/* Stable controls: selecting a filter never replaces the dialog's controls. */
+.rk-comment-settings .dlgbox{width:min(540px,calc(100vw - 28px));max-height:calc(100dvh - 32px);overflow:auto}
+.rk-comment-settings fieldset{border:1px solid var(--line);padding:14px;margin:0 0 16px;min-width:0}
+.rk-comment-settings legend{font-family:var(--hand);padding:0 6px}
+.rk-comment-settings fieldset label{display:flex;align-items:center;gap:10px;min-height:40px;text-transform:none;letter-spacing:normal;cursor:pointer}
+.rk-comment-settings input{flex:0 0 auto;margin:0;accent-color:var(--text)}
+.rk-comment-settings button{box-sizing:border-box!important;transform:none!important;border-width:1px!important}
+.rk-comment-settings button:focus-visible,.rk-comment-settings input:focus-visible{outline:2px solid var(--text)!important;outline-offset:3px}
+@media(min-width:1050px){
+body:not(.mode-edit) .rk-bc-sideview{max-width:1600px!important}
+body:not(.mode-edit) .rk-bc-sideview .blocks>.blk{display:grid!important;grid-template-columns:minmax(0,1fr) 300px;column-gap:24px;align-items:start}
+body:not(.mode-edit) .rk-bc-sideview .blocks>.blk>.body{grid-column:1;grid-row:1;min-width:0}
+body:not(.mode-edit) .rk-bc-sideview .blocks>.blk>.rk-bc-slot,
+body:not(.mode-edit) .rk-bc-sideview .blocks>.blk>.noteslot{grid-column:2;min-width:0}
+body:not(.mode-edit) .rk-bc-sideview .blocks>.blk>.rk-bc-slot{grid-row:1;margin-top:0}
+body:not(.mode-edit) .rk-bc-sideview .blocks>.blk>.noteslot:empty{display:none}
+body:not(.mode-edit) .rk-bc-sideview .rk-bc-thread{min-width:0;overflow-wrap:anywhere}
+}
 .rk-bc-bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:0 0 16px;font-family:var(--hand);font-size:15px}
 .rk-bc-bar .rk-bc-title{letter-spacing:.1em;text-transform:uppercase;font-size:13px;color:var(--muted);margin-right:4px}
 .rk-bc-bar .sp{flex:1}
@@ -146,13 +165,69 @@ function composer(opts){
   f.querySelector('[data-ok]').onclick=async e=>{ e.stopPropagation(); const ta=f.querySelector('textarea'); const text=ta.value.trim(); if(!text){ ta.focus(); return; } const btns=f.querySelectorAll('button'); btns.forEach(b=>b.disabled=true); const sel=f.querySelector('select'); try{ await opts.onOk(text, sel?sel.value:(opts.shares&&opts.shares[0]?opts.shares[0].id:null)); }catch(err){ f.querySelector('[data-msg]').textContent=humanErr(err); btns.forEach(b=>b.disabled=false); } };
   return f;
 }
+const commentControls=new WeakMap();
+function commentPreferenceKey(){return 'rk:comments-layout:v1:'+(user()?.id||'local')+':'+(betaMatch?betaMatch[1]:'author');}
+function applyCommentLayout(bar,state){
+  requestAnimationFrame(()=>{
+    const host=bar.closest('.view,#view2Body');
+    if(host)host.classList.toggle('rk-bc-sideview',state.commentLayout==='side');
+  });
+}
 function filterBar(state,onChange,extra){
-  const bar=document.createElement('div'); bar.className='rk-bc-bar'; bar.contentEditable='false';
-  bar.innerHTML=`<span class="rk-bc-title">Комментарии</span><div class="chips" style="margin:0">${[['all','Все'],['author','Автор'],['editor','Бета']].map(([k,l])=>`<button type="button" class="chip${state.filter===k?' on':''}" data-f="${k}">${l}</button>`).join('')}<button type="button" class="chip${state.showDone?' on':''}" data-done>Решённые${state.doneCount?' · '+state.doneCount:''}</button></div><span class="sp"></span>`;
-  bar.querySelectorAll('[data-f]').forEach(b=>b.onclick=()=>{ state.filter=b.dataset.f; onChange(); });
-  bar.querySelector('[data-done]').onclick=()=>{ state.showDone=!state.showDone; onChange(); };
-  if(extra) bar.appendChild(extra);
-  return bar;
+  if(!state.commentLayout){try{state.commentLayout=localStorage.getItem(commentPreferenceKey())==='side'?'side':'bottom';}catch(e){state.commentLayout='bottom';}}
+  const bar=document.createElement('div');bar.className='rk-bc-bar';bar.contentEditable='false';
+  const trigger=document.createElement('button');trigger.type='button';trigger.className='btn';trigger.textContent='Комментарии';trigger.setAttribute('aria-haspopup','dialog');
+  bar.appendChild(trigger);
+  let controls=commentControls.get(state);
+  if(!controls){controls={modal:null,extra:null,onChange:null,bar:null,trigger:null};commentControls.set(state,controls);}
+  Object.assign(controls,{extra,onChange,bar,trigger});
+  const sync=()=>{
+    const m=controls.modal;if(!m)return;
+    m.querySelectorAll('[name=rkCommentFilter]').forEach(i=>i.checked=i.value===state.filter);
+    m.querySelectorAll('[name=rkCommentLayout]').forEach(i=>i.checked=i.value===state.commentLayout);
+    m.querySelector('[data-show-done]').checked=!!state.showDone;
+    m.querySelector('[data-done-count]').textContent=state.doneCount?' ('+state.doneCount+')':'';
+    m.querySelector('[data-general]').disabled=!controls.extra||controls.extra.disabled;
+  };
+  trigger.onclick=()=>{
+    if(controls.modal?.isConnected){controls.modal.querySelector('[data-close]').focus();return;}
+    const m=document.createElement('div');m.className='modal rk-comment-settings';
+    m.setAttribute('role','dialog');m.setAttribute('aria-modal','true');m.setAttribute('aria-label','Настройки комментариев');
+    m.innerHTML=`<div class="dlgbox"><div class="dlgbox-head"><h3>Комментарии</h3><button type="button" class="icon-btn" data-close aria-label="Закрыть">✕</button></div><div class="dlgbox-body">
+      <fieldset><legend>Расположение комментариев</legend>
+      <label><input type="radio" name="rkCommentLayout" value="bottom"> Под текстом</label>
+      <label><input type="radio" name="rkCommentLayout" value="side"> Справа от текста</label>
+      <p class="muted">На узком экране комментарии остаются под текстом.</p></fieldset>
+      <fieldset><legend>Показывать комментарии</legend>
+      <label><input type="radio" name="rkCommentFilter" value="all"> Все</label>
+      <label><input type="radio" name="rkCommentFilter" value="author"> Автор</label>
+      <label><input type="radio" name="rkCommentFilter" value="editor"> Бета</label>
+      <label><input type="checkbox" data-show-done> Показывать решённые<span data-done-count></span></label></fieldset>
+      <p class="muted" role="status" data-status></p></div><div class="dlgbox-foot"><button type="button" class="btn" data-general>Комментарий к главе</button><button type="button" class="btn" data-close>Готово</button></div></div>`;
+    controls.modal=m;
+    function close(){document.removeEventListener('keydown',key,true);m.remove();controls.modal=null;if(controls.trigger?.isConnected)controls.trigger.focus({preventScroll:true});}
+    function key(e){
+      if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close();return;}
+      if(e.key!=='Tab')return;
+      const a=[...m.querySelectorAll('button:not(:disabled),input')].filter(x=>x.getClientRects().length),first=a[0],last=a[a.length-1];
+      if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+      else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+    }
+    m.addEventListener('change',e=>{
+      const i=e.target;
+      if(i.name==='rkCommentLayout'){
+        state.commentLayout=i.value;
+        try{localStorage.setItem(commentPreferenceKey(),i.value);m.querySelector('[data-status]').textContent='';}catch(e){m.querySelector('[data-status]').textContent='Выбор действует сейчас, но браузер не разрешил сохранить его.';}
+        applyCommentLayout(controls.bar,state);
+      }else if(i.name==='rkCommentFilter'){state.filter=i.value;controls.onChange();}
+      else if(i.hasAttribute('data-show-done')){state.showDone=i.checked;controls.onChange();}
+      sync();
+    });
+    m.addEventListener('click',e=>{if(e.target===m||e.target.closest('[data-close]'))close();});
+    m.querySelector('[data-general]').onclick=()=>{const action=controls.extra;close();if(action&&!action.disabled)action.click();};
+    document.body.appendChild(m);sync();document.addEventListener('keydown',key,true);m.querySelector('[data-close]').focus();
+  };
+  sync();applyCommentLayout(bar,state);return bar;
 }
 function visibleThreads(threads,state){ return threads.filter(t=>(state.showDone||!t.root.done)&&(state.filter==='all'||t.root.role===state.filter)); }
 
