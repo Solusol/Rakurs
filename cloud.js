@@ -260,5 +260,5 @@ function humanErr(e){
   return s;
 }
 
-window.RK_CLOUD = { enabled, boot, push, pushProjects, openDialog, flushNow, onLoginFresh:null, sync:()=>pullAll(), get user(){ return user; }, get state(){ return state; } };
+window.RK_CLOUD = { enabled, boot, push, pushProjects, openDialog, flushNow, onLoginFresh:null, sync:()=>pullAll(), get user(){ return user; }, get state(){ return state; }, get client(){ return sb; } };
 })();

@@ -1,5 +1,6 @@
 (function(){
 'use strict';
+if(window.RK_BETA_MODE) return; /* открыта ссылка для беты — экран строит beta.js */
 /* several independent projects live side by side; «main» is Лимб with the built-in text, others start empty */
 const PROJ_KEY='wsblankProjects';
 function loadProjects(){ let r=null; try{ r=JSON.parse(localStorage.getItem(PROJ_KEY)||'null'); }catch(e){} if(!r || !r.list) r={cur:'main', list:[{id:'main', name:'Ракурс', builtin:true}]}; if(!r.list.find(x=>x.id==='main')) r.list.unshift({id:'main', name:'Ракурс', builtin:true}); if(!r.list.find(x=>x.id===r.cur)) r.cur='main'; return r; }
@@ -109,7 +110,7 @@ function setStoreState(cls, text){
 }
 let lastWriteOK=true;
 let saveT=null, dirty=false;
-function flush(){ clearTimeout(saveT); saveT=null; if(!dirty) return; dirty=false; if(storageOK){ const ok = store.write(D); lastWriteOK=ok; if(ok){ try{ if(window.RK_CLOUD) RK_CLOUD.push(KEY, D); }catch(e){} } if(ok) setStoreState('ok','Сохранено в браузере · '+new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})); else setStoreState('bad','Не удалось сохранить в браузере — сохрани файл проекта'); } }
+function flush(){ clearTimeout(saveT); saveT=null; if(!dirty) return; dirty=false; if(storageOK){ const ok = store.write(D); lastWriteOK=ok; if(ok){ try{ if(window.RK_CLOUD) RK_CLOUD.push(KEY, D); }catch(e){} try{ if(window.RK_BETA) RK_BETA.onFlush(); }catch(e){} } if(ok) setStoreState('ok','Сохранено в браузере · '+new Date().toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'})); else setStoreState('bad','Не удалось сохранить в браузере — сохрани файл проекта'); } }
 function save(){
   if(tabReadOnly){ if(Date.now()-(save._ro||0)>5000 && document.hasFocus()){ save._ro=Date.now(); toast('Это окно только для чтения: проект редактируется в другом окне'); } return; }
   D.updated = Date.now(); dirty=true; TEXTS=null; if(curPage) cacheBase(curPage); if(storageOK) setStoreState('saving');
@@ -344,7 +345,7 @@ function renderPaneLegacy(focusBid){
     const body=el.querySelector('.body'); const text=body.textContent;
     Object.values(D.anns).forEach(a=>{ if(a.b1!==b.id||a.b2!==b.id||!a.text||a.done) return; let r=null; if(text.slice(a.o1,a.o2)===a.q) r=[a.o1,a.o2]; else { const i=text.indexOf(a.q); if(i>=0) r=[i,i+a.q.length]; } if(r&&r[1]>r[0]) wrapRange(body, r[0], r[1], a.id); });
     const slot=el.querySelector('.noteslot'); const n=noteOf(b.id); if(n && !n.done) slot.appendChild(noteCard(n,'Заметка к абзацу'));
-    Object.values(D.anns).filter(a=>a.b1===b.id && a.text && !a.done).sort((a,b)=>a.o1-b.o1).forEach(a=>{ const c=noteCard({text:a.text,quote:a.q,kind:a.kind}, a.by?('Заметка редактора · '+esc(a.by)):'Заметка к фрагменту'); if(a.by) c.classList.add('editor'); slot.appendChild(c); });
+    Object.values(D.anns).filter(a=>a.b1===b.id && a.text && !a.done).sort((a,b)=>a.o1-b.o1).forEach(a=>{ const c=noteCard({text:a.text,quote:a.q,kind:a.kind}, a.by?('Заметка беты · '+esc(a.by)):'Заметка к фрагменту'); if(a.by) c.classList.add('editor'); slot.appendChild(c); });
     wrap.appendChild(el); });
   host.innerHTML=`<div class="pane-title">${gtag(groupOf(p.section))} ${esc(secLabel(p.section))} · ${esc(p.title)}${showSub(p)?' · '+esc(p.sub):''}</div>${isArchive(p)?tocHTML(p,true):''}`; host.appendChild(wrap);
   blocks.forEach((b,i)=>{ wrap.children[i].id='p2-'+b.id; });
@@ -642,7 +643,7 @@ function renderPageLegacy(p, focusId){
   const visibleIds=new Set(pageBlocks(p).filter(b=>!b.deleted).map(b=>b.id));
   const lostAnns=Object.values(D.anns).filter(a=>a.text && a.text.trim() && (!a.done||showDone) && ((a.lost && a.pid===p.id) || (!a.lost && PAGE_OF[a.b1]===p.id && !visibleIds.has(a.b1))));
   if(lostAnns.length){ const box=document.createElement('div'); box.className='lost-box'; box.innerHTML=`<div class="lost-t">Заметки без места в тексте (${lostAnns.length}) — абзац, к которому они были привязаны, удалён или переписан</div>`;
-    lostAnns.forEach(a=>{ const c=noteCard({text:a.text, quote:a.q, kind:a.kind, done:a.done}, a.by?('Заметка редактора · '+esc(a.by)):'Заметка к фрагменту', ()=>{ a.done=!a.done; save(); rerender(); }); c.classList.add('lost'); if(a.by) c.classList.add('editor');
+    lostAnns.forEach(a=>{ const c=noteCard({text:a.text, quote:a.q, kind:a.kind, done:a.done}, a.by?('Заметка беты · '+esc(a.by)):'Заметка к фрагменту', ()=>{ a.done=!a.done; save(); rerender(); }); c.classList.add('lost'); if(a.by) c.classList.add('editor');
       const ab=document.createElement('button'); ab.className='anchor-btn'; ab.textContent='Привязать к выделению'; ab.onclick=e=>{ e.stopPropagation(); startAnchor(a.id); };
       const db=document.createElement('button'); db.className='anchor-btn'; db.textContent='Удалить'; db.onclick=e=>{ e.stopPropagation(); delete D.anns[a.id]; save(); rerender(); };
       c.querySelector('.meta').append(ab, db); box.appendChild(c); });
@@ -766,7 +767,7 @@ function renderNote(el, editing){
         a.text?()=>{ delete D.anns[a.id]; save(); rerender(); }:null, a.kind));
     } else if(a.text && a.text.trim() && (!a.done || showDone)){
       const lost=annLost(a);
-      const c=noteCard({text:a.text, quote:a.q, kind:a.kind, done:a.done}, (a.by?('Заметка редактора · '+esc(a.by)):'Заметка к фрагменту')+(lost?' · <b class="lost">фрагмент изменён — нужна перепривязка</b>':''), ()=>{ a.done=!a.done; save(); rerender(); }); c.dataset.ann=a.id; if(a.by) c.classList.add('editor'); if(lost){ c.classList.add('lost'); const ab=document.createElement('button'); ab.className='anchor-btn'; ab.textContent='Привязать к выделению'; ab.onclick=e=>{ e.stopPropagation(); startAnchor(a.id); }; c.querySelector('.meta').appendChild(ab); }
+      const c=noteCard({text:a.text, quote:a.q, kind:a.kind, done:a.done}, (a.by?('Заметка беты · '+esc(a.by)):'Заметка к фрагменту')+(lost?' · <b class="lost">фрагмент изменён — нужна перепривязка</b>':''), ()=>{ a.done=!a.done; save(); rerender(); }); c.dataset.ann=a.id; if(a.by) c.classList.add('editor'); if(lost){ c.classList.add('lost'); const ab=document.createElement('button'); ab.className='anchor-btn'; ab.textContent='Привязать к выделению'; ab.onclick=e=>{ e.stopPropagation(); startAnchor(a.id); }; c.querySelector('.meta').appendChild(ab); }
       c.addEventListener('click',e=>{ e.stopPropagation(); renderNote(el,{kind:'ann', id:a.id}); });
       c.addEventListener('mouseenter',()=>$$(`mark.ann[data-ann="${a.id}"]`).forEach(m=>m.classList.add('hot')));
       c.addEventListener('mouseleave',()=>$$(`mark.ann[data-ann="${a.id}"]`).forEach(m=>m.classList.remove('hot')));
@@ -792,7 +793,7 @@ function allNotes(){
     const blocks=pageBlocks(p).filter(b=>!b.deleted); const pos={}; blocks.forEach((b,i)=>pos[b.id]=i);
     if(D.pageNotes[p.id] && D.pageNotes[p.id].trim()) out.push({p, pos:-1, text:D.pageNotes[p.id], quote:'', label:'Заметка к странице', kind:'', done:false, pageNote:true});
     blocks.forEach(b=>{ const n=noteOf(b.id); if(n) out.push({p, pos:pos[b.id], bid:b.id, text:n.text, quote:n.quote||'', label:'К абзацу', kind:n.kind||'', done:!!n.done, obj:n}); });
-    Object.values(D.anns).forEach(a=>{ if(!a.text || !a.text.trim()) return; if(a.lost || (PAGE_OF[a.b1]===p.id && pos[a.b1]===undefined)){ if((a.lost?a.pid:PAGE_OF[a.b1])!==p.id) return; out.push({p, pos:-0.5, ann:a.id, text:a.text, quote:a.q, label:'Без места — нужна перепривязка', kind:a.kind||'', done:!!a.done, obj:a, by:a.by}); return; } if(PAGE_OF[a.b1]!==p.id) return; out.push({p, pos:(pos[a.b1]??0)+(a.o1||0)/1e6, bid:a.b1, ann:a.id, text:a.text, quote:a.q, label:(a.by?('Редактор · '+a.by):'К фрагменту')+(annLost(a)?' · фрагмент изменён':''), kind:a.kind||'', done:!!a.done, obj:a, by:a.by}); });
+    Object.values(D.anns).forEach(a=>{ if(!a.text || !a.text.trim()) return; if(a.lost || (PAGE_OF[a.b1]===p.id && pos[a.b1]===undefined)){ if((a.lost?a.pid:PAGE_OF[a.b1])!==p.id) return; out.push({p, pos:-0.5, ann:a.id, text:a.text, quote:a.q, label:'Без места — нужна перепривязка', kind:a.kind||'', done:!!a.done, obj:a, by:a.by}); return; } if(PAGE_OF[a.b1]!==p.id) return; out.push({p, pos:(pos[a.b1]??0)+(a.o1||0)/1e6, bid:a.b1, ann:a.id, text:a.text, quote:a.q, label:(a.by?('Бета · '+a.by):'К фрагменту')+(annLost(a)?' · фрагмент изменён':''), kind:a.kind||'', done:!!a.done, obj:a, by:a.by}); });
   });
   return out.sort((x,y)=>PAGES.indexOf(x.p)-PAGES.indexOf(y.p) || x.pos-y.pos);
 }
@@ -1631,7 +1632,7 @@ function openExport(){
 }
 const EX_PRESETS={
   reader:{scope:'reader', content:'text', hint:'Главы и экстры одним файлом, без заметок, без базы истории и планов.'},
-  beta:{scope:'reader', content:'both', hint:'Главы и экстры с заметками к фрагментам и к страницам — для беты или редактора. База истории не включается.'},
+  beta:{scope:'reader', content:'both', hint:'Главы и экстры с заметками к фрагментам и к страницам — для беты. База истории не включается.'},
   all:{scope:'all', content:'both', hint:'Всё, что есть: текст, экстры, база истории, заметки.'}
 };
 function applyPreset(id){ const pr=EX_PRESETS[id]; if(!pr) return; $$('#exPresets .chip').forEach(c=>c.classList.toggle('on', c.dataset.preset===id)); $$('#exScopeList input[name=exs]').forEach(i=>i.checked=true); exSyncAll(); $(`input[name=exc][value=${pr.content}]`).checked=true; $('#exPresetHint').textContent=pr.hint; }
@@ -1755,6 +1756,7 @@ function importTextInto(text, parent, splitMode){
   return ids;
 }
 window.RK_IMPORT_TEXT=importTextInto;
+window.RK_BETA_BRIDGE={ get D(){ return D; }, PAGE, pageBlocks, blockText, wsBook, wsChapters, wsType, wsData, save, toast, esc, get PALETTES(){ return PALETTES; }, get curProject(){ return CUR_PROJ; }, get curPage(){ return curPage; }, get mode(){ return mode; }, get prefs(){ return prefs; } };
 window.RK_ADD_ANNS=function(list, pid){ const dec=h=>{ const d=document.createElement('div'); d.innerHTML=h||''; return d.textContent; }; const nw=x=>String(x||'').replace(/\s+/g,' ').trim(); const cands=Object.values(BLOCK).filter(b=>b && b.h && (!pid || PAGE_OF[b.id]===pid)); let n=0; const miss=[]; [].concat(list||[]).forEach(it=>{ if(!it || !it.id || !it.q || D.anns[it.id]) return; let best=null; for(const b of cands){ const t=dec(b.h); if(nw(t)===nw(it.ptext)){ best={b,t}; break; } } if(!best){ for(const b of cands){ const t=dec(b.h); if(t.includes(it.q)){ best={b,t}; break; } } } if(!best){ miss.push(it.id); return; } const t=best.t; const hint=typeof it.qEnd==='number'?it.qEnd:null; let o1=-1, pos=t.indexOf(it.q); while(pos>=0){ if(o1<0 || (hint!==null && Math.abs(pos+it.q.length-hint)<Math.abs(o1+it.q.length-hint))) o1=pos; pos=t.indexOf(it.q,pos+1); } if(o1<0){ miss.push(it.id); return; } D.anns[it.id]={id:it.id,b1:best.b.id,o1,b2:best.b.id,o2:o1+it.q.length,q:it.q,text:String(it.text||''),by:it.by||'',ts:(it.ts&&Date.parse(it.ts))||Date.now(),pid:PAGE_OF[best.b.id]}; n++; }); if(n){ save(); rerender(); } return {added:n, missing:miss}; };
 window.RK_WS_MOVE=function(ids, parent){ if(!wsWritable()) return 0; ids=[].concat(ids); const par=parent&&PAGE[parent]&&(wsType(PAGE[parent])==='folder'||wsType(PAGE[parent])==='text')?parent:''; let n=0; ids.forEach(id=>{ const u=wsUser(id); if(!u||id===par||(par&&wsDescendant(par,id))) return; u.parent=par; n++; }); const ws=wsData(); if(ws.blockOrder){ for(const k in ws.blockOrder) ws.blockOrder[k]=ws.blockOrder[k].filter(x=>!ids.includes(x)); } registerUserPages(); wsCommit(); buildToc(); route(); return n; };
 function applyImport(){
@@ -2281,6 +2283,7 @@ function renderPage(p,focusId){
   head.querySelectorAll('[data-a=chprops],[data-props]').forEach(el=>el.remove());wsBindRename(head.querySelector('h1'),p);
   const archive=head.querySelector('[data-a=archive]');if(archive)archive.remove();
   rkFieldColor(p,$('#view'));
+  try{ if(window.RK_BETA) RK_BETA.onPageRender(p,$('#view')); }catch(e){ console.warn(e); }
   return;
  }
  wsRenderBlock(p);
@@ -2336,7 +2339,9 @@ function rkContents(p,host,side){
   const add=document.createElement('button');add.type='button';add.className='rk-add-chapter';add.textContent='Добавить главу';add.onclick=()=>{menu.hidden=true;button.setAttribute('aria-expanded','false');rkAddChapter(wsBook(p).id);};menu.appendChild(add);
  }
  button.onclick=()=>{const opening=menu.hidden;if(opening)populate();menu.hidden=!opening;button.setAttribute('aria-expanded',String(opening));if(opening)menu.querySelector('button')?.focus();};
- rkDropdownEvents(control,button,menu);control.append(button,menu);host.prepend(control);
+ rkDropdownEvents(control,button,menu);control.append(button,menu);
+ if(window.RK_BETA&&RK_BETA.available()){const beta=document.createElement('button');beta.type='button';beta.className='btn rk-beta-access';beta.textContent='Доступ для беты';beta.onclick=()=>RK_BETA.openShareDialog(wsBook(p));control.appendChild(beta);}
+ host.prepend(control);
 }
 function rkAddChapter(parent){
  if(!wsWritable())return;
