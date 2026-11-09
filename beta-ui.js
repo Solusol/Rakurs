@@ -74,3 +74,145 @@ document.addEventListener('change',schedule);window.addEventListener('resize',sc
 if(window.ResizeObserver){const sizes=new ResizeObserver(schedule);['view','view2Body','rkBetaView'].forEach(id=>{const el=document.getElementById(id);if(el)sizes.observe(el);});}
 document.addEventListener('click',e=>{if(menu&&!menu.hidden&&!e.target.closest('#rkBetaBackground'))closeMenu();});document.addEventListener('keydown',e=>{if(e.key==='Escape'&&menu&&!menu.hidden){e.preventDefault();closeMenu();anchor.focus();}});schedule();
 })();
+
+/* Unified placement for legacy notes and cloud comments. Storage is unchanged. */
+(function(){
+'use strict';
+const ROOT=':is(#view,#view2Body,#rkBetaView)';
+const CARD='.noteslot .note,.rk-bc-slot > .rk-bc-thread,.rk-bc-general > .rk-bc-thread,.rk-bc-slot > .rk-bc-compose,.rk-bc-general > .rk-bc-compose';
+const ids=new WeakMap(),normalWidths=new WeakMap(),observed=new Set();
+let sequence=0,frame=0,active='';
+const resize=window.ResizeObserver?new ResizeObserver(schedule):null;
+const style=document.createElement('style');style.id='rk-unified-comments-v1';
+style.textContent=`
+html:root body ${ROOT} .page-note{display:none!important}
+html:root body ${ROOT}.rk-bc-sideview:not(.rk-unified-side){max-width:var(--rk-u-normal-max,none)!important}
+html:root body ${ROOT}:not(.rk-unified-side) .blocks>.blk{display:block!important;grid-template-columns:none!important}
+html:root body ${ROOT}:not(.rk-unified-side) .blocks{width:auto!important;position:relative!important}
+html:root body ${ROOT}:not(.rk-unified-side)::after{content:none!important}
+html:root body ${ROOT}:not(.rk-unified-side) :is(.rk-bc-slot,.rk-bc-general)>.rk-bc-thread,
+html:root body ${ROOT}:not(.rk-unified-side) :is(.rk-bc-slot,.rk-bc-general)>.rk-bc-compose{position:relative!important;top:auto!important;right:auto!important;left:auto!important;width:auto!important;clip-path:none!important}
+html:root body ${ROOT}.rk-unified-side{position:relative!important;max-width:1600px!important;--rk-comment-tail:0px!important}
+html:root body ${ROOT}.rk-unified-side .blocks{position:static!important;width:calc(100% - 324px)!important;max-width:none!important;box-sizing:border-box!important;margin-inline:0!important}
+html:root body ${ROOT}.rk-unified-side .blocks>.blk{display:block!important;position:static!important;min-height:0!important;grid-template-columns:none!important}
+html:root body ${ROOT}.rk-unified-side .blocks>.blk>.body{grid-column:auto!important;grid-row:auto!important;min-width:0}
+html:root body ${ROOT}.rk-unified-side :is(.noteslot,.rk-bc-slot,.rk-bc-general){display:contents!important;position:static!important}
+html:root body ${ROOT}.rk-unified-side .rk-u-card{position:absolute!important;top:var(--rk-u-top,0px)!important;right:var(--rk-u-right,28px)!important;left:auto!important;width:300px!important;max-width:300px!important;min-width:0!important;box-sizing:border-box!important;margin:0!important;z-index:2;clip-path:inset(var(--rk-u-clip-top,0px) 0 var(--rk-u-clip-bottom,0px) 0)!important;overflow-wrap:anywhere}
+html:root body ${ROOT}.rk-unified-side .note.rk-u-card{background:var(--rk-bg,var(--bg))!important;color:var(--rk-text,var(--text))!important;border:1px solid var(--rk-line,var(--line))!important;border-left:4px solid var(--rk-secondary,var(--green))!important;box-shadow:none!important;border-radius:4px;padding:10px 12px 8px!important;font-size:15px;line-height:1.45}
+html:root body ${ROOT}.rk-unified-side .note.rk-u-card :is(.q,.meta,.link){color:inherit!important}
+html:root body ${ROOT}.rk-unified-side .rk-u-card.rk-u-active{outline:1px solid var(--rk-text,var(--text));outline-offset:2px}
+html:root body ${ROOT}.rk-unified-side::after{content:''!important;display:block!important;height:var(--rk-u-tail,0px)!important;pointer-events:none}
+`;
+document.head.appendChild(style);
+function schedule(){if(!frame)frame=requestAnimationFrame(()=>{frame=0;update();});}
+function key(card){if(!ids.has(card))ids.set(card,'u'+(++sequence));return ids.get(card);}
+function set(el,name,value){if(el.style.getPropertyValue(name)!==value)el.style.setProperty(name,value);}
+function normal(text){return (text||'').replace(/[«»“”]/g,'').replace(/\s+/g,' ').trim();}
+function sideWanted(host){
+ const match=location.hash.match(/^#\/beta\/([0-9a-f-]{36})/i);
+ const user=window.RK_CLOUD?.user?.id||'local';
+ try{
+  const value=localStorage.getItem('rk:comments-layout:v1:'+user+':'+(match?match[1]:'author'));
+  if(value==='side'||value==='bottom')return value==='side';
+ }catch(e){}
+ return host.classList.contains('rk-bc-sideview');
+}
+function pack(items,selected,viewportTop,textBottom){
+ let bottom=0;
+ const out=items.map(item=>{const top=Math.max(item.anchor,bottom);bottom=top+item.height+12;return {...item,top};});
+ const index=out.findIndex(item=>item.key===selected);
+ if(index<0)return out;
+ const item=out[index];
+ item.top=Math.max(item.anchor,Math.min(viewportTop,Math.max(item.anchor,textBottom-item.height)));
+ for(let i=index-1;i>=0;i--)out[i].top=Math.min(out[i].top,out[i+1].top-out[i].height-12);
+ for(let i=index+1;i<out.length;i++)out[i].top=Math.max(out[i].anchor,out[i-1].top+out[i-1].height+12);
+ return out;
+}
+function viewport(host){
+ let top=0,bottom=innerHeight;
+ for(let p=host;p&&p!==document.body;p=p.parentElement){
+  if(/auto|scroll|hidden|clip/.test(getComputedStyle(p).overflowY)){
+   const r=p.getBoundingClientRect();top=Math.max(top,r.top+p.clientTop);bottom=Math.min(bottom,r.top+p.clientTop+p.clientHeight);
+  }
+ }
+ const header=document.querySelector(host.id==='rkBetaView'?'.rk-beta-bar':'.bar');
+ if(header){const r=header.getBoundingClientRect();if(r.bottom>top&&r.top<bottom)top=Math.max(top,r.bottom);}
+ return {top,bottom};
+}
+function update(){
+ const watch=new Set();
+ document.querySelectorAll(ROOT).forEach(host=>{
+  if(!normalWidths.has(host)){
+   const had=host.classList.contains('rk-bc-sideview');
+   if(had)host.classList.remove('rk-bc-sideview');
+   normalWidths.set(host,getComputedStyle(host).maxWidth);
+   if(had)host.classList.add('rk-bc-sideview');
+  }
+  set(host,'--rk-u-normal-max',normalWidths.get(host));
+  const blocks=host.querySelector('.blocks');
+  const cards=[...host.querySelectorAll(CARD)].filter(card=>!card.hidden&&getComputedStyle(card).display!=='none');
+  cards.forEach(card=>{if(!card.classList.contains('rk-u-card'))card.classList.add('rk-u-card');key(card);});
+  const enabled=sideWanted(host)&&!!blocks&&cards.length>0&&!document.body.classList.contains('mode-edit')&&innerWidth>=1050&&host.clientWidth>=760;
+  if(host.classList.contains('rk-unified-side')!==enabled)host.classList.toggle('rk-unified-side',enabled);
+  if(!enabled){
+   host.style.removeProperty('--rk-u-tail');
+   cards.forEach(card=>{card.classList.remove('rk-u-active');['--rk-u-top','--rk-u-clip-top','--rk-u-clip-bottom'].forEach(p=>card.style.removeProperty(p));});
+   return;
+  }
+  watch.add(host);watch.add(blocks);
+  const cs=getComputedStyle(host),rect=host.getBoundingClientRect(),origin=rect.top+host.clientTop-host.scrollTop;
+  set(host,'--rk-u-right',(parseFloat(cs.paddingRight)||0)+'px');
+  const vp=viewport(host),textBottom=blocks.getBoundingClientRect().bottom-origin;
+  const marks=[...host.querySelectorAll('mark.rk-bc-mark,mark.ann')];
+  const items=cards.map((card,index)=>{
+   watch.add(card);
+   const block=card.closest('.blk');
+   const scoped=block?marks.filter(mark=>block.contains(mark)):marks;
+   let anchor=card.classList.contains('rk-bc-thread')?scoped.find(mark=>mark.dataset.bc===card.dataset.id):null;
+   if(!anchor&&card.classList.contains('note')){
+    const quote=normal(card.querySelector('.q')?.textContent);
+    if(quote)anchor=scoped.find(mark=>normal(mark.textContent)===quote);
+   }
+   anchor=anchor||block?.querySelector(':scope > .body')||blocks;
+   return {card,key:key(card),index,anchor:Math.max(0,anchor.getBoundingClientRect().top-origin),height:card.getBoundingClientRect().height};
+  }).sort((a,b)=>a.anchor-b.anchor||a.index-b.index);
+  const placed=pack(items,active,vp.top+12-origin,textBottom);
+  let end=textBottom;
+  placed.forEach(item=>{
+   const y=origin+item.top;
+   set(item.card,'--rk-u-top',item.top.toFixed(2)+'px');
+   set(item.card,'--rk-u-clip-top',Math.min(item.height,Math.max(0,vp.top-y)).toFixed(2)+'px');
+   set(item.card,'--rk-u-clip-bottom',Math.min(item.height,Math.max(0,y+item.height-vp.bottom)).toFixed(2)+'px');
+   if(item.card.classList.contains('rk-u-active')!==(item.key===active))item.card.classList.toggle('rk-u-active',item.key===active);
+   end=Math.max(end,item.top+item.height);
+  });
+  set(host,'--rk-u-tail',Math.max(0,end-textBottom+12).toFixed(2)+'px');
+ });
+ if(resize){observed.forEach(el=>{if(!watch.has(el)){resize.unobserve(el);observed.delete(el);}});watch.forEach(el=>{if(!observed.has(el)){observed.add(el);resize.observe(el);}});}
+}
+function activate(e){
+ const target=e.target instanceof Element?e.target:null;
+ const host=target?.closest(ROOT);if(!host)return;
+ const card=target.closest('.rk-u-card');
+ if(card){active=key(card);schedule();return;}
+ const mark=target.closest('mark.rk-bc-mark,mark.ann');
+ if(mark){
+  const block=mark.closest('.blk');
+  const match=[...host.querySelectorAll(CARD)].find(c=>c.classList.contains('rk-bc-thread')?c.dataset.id===mark.dataset.bc:(c.closest('.blk')===block&&normal(c.querySelector('.q')?.textContent)===normal(mark.textContent)));
+  if(match){active=key(match);schedule();}
+ }
+}
+document.addEventListener('pointerdown',activate,true);
+document.addEventListener('focusin',activate,true);
+document.addEventListener('scroll',schedule,{capture:true,passive:true});
+document.addEventListener('input',schedule);
+document.addEventListener('change',schedule);
+document.addEventListener('load',schedule,true);
+window.addEventListener('resize',schedule,{passive:true});
+window.addEventListener('storage',schedule);
+window.addEventListener('hashchange',()=>{active='';schedule();});
+new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,characterData:true});
+new MutationObserver(schedule).observe(document.body,{attributes:true,attributeFilter:['class','data-font','data-ui','data-theme','data-palette','data-rk-mode','data-rk-palette']});
+if(document.fonts?.ready)document.fonts.ready.then(schedule);
+schedule();
+})();
