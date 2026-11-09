@@ -20,10 +20,13 @@ body.rk-beta-mode .rk-beta-readonly,body.rk-beta-mode .rk-beta-user,body.rk-beta
 html body #rkBeta #rkBetaView .blocks.rk-custom-bg{background:var(--beta-reader-bg)!important;color:var(--beta-reader-fg)!important;--text:var(--beta-reader-fg);--rk-text:var(--beta-reader-fg);--panel-text:var(--beta-reader-fg);--muted:var(--beta-reader-fg);--paper-2:var(--beta-reader-fg);--heading:var(--beta-reader-fg);--heading-2:var(--beta-reader-fg);--rk-heading:var(--beta-reader-fg);--balance-title:var(--beta-reader-fg)}
 html body #rkBeta #rkBetaView .blocks.rk-custom-bg .blk,html body #rkBeta #rkBetaView .blocks.rk-custom-bg .blk>.body{background:transparent!important;color:var(--beta-reader-fg)!important}
 html body #rkBeta #rkBetaView .blocks.rk-custom-bg .blk>.body :is(h1,h2,h3,h4,h5,h6,p,a,li,span){color:inherit!important}
-html:root body .modal.look.look.look .tile.tile.tile{position:relative}
-html:root body .modal.look.look.look .tile.tile.tile:has(input[type=radio]:checked){border:2px solid var(--text)!important;outline:2px solid var(--text)!important;outline-offset:2px!important;box-shadow:inset 0 0 0 2px var(--bg)!important;background:color-mix(in srgb,var(--text) 16%,var(--bg))!important}
-html:root body .modal.look.look.look .tile.tile.tile:has(input[type=radio]:checked)::after{content:'Выбран';position:absolute;top:3px;right:3px;padding:2px 5px;border-radius:4px;background:var(--text);color:var(--bg);font:12px/1.2 var(--hand);pointer-events:none}
-html:root body .modal.look.look.look .tile.tile.tile:has(input[type=radio]:focus-visible){outline:2px dashed var(--text)!important;outline-offset:4px!important}
+html:root body .modal.look.look.look .tile.tile.tile{position:relative;box-sizing:border-box;border-width:2px!important;outline:none!important;box-shadow:none!important;background:var(--bg)!important}
+html:root body .modal.look.look.look .tile.tile.tile:has(input[type=radio]:checked){border:2px solid var(--text)!important;outline:none!important;box-shadow:none!important;background:var(--bg)!important}
+html:root body .modal.look.look.look .tile.tile.tile::after{content:none!important;display:none!important}
+html:root body .modal.look.look.look .tile.tile.tile .fs{background:transparent!important;outline:none!important;box-shadow:none!important;border:0!important}
+html:root body .modal.look.look.look .tile.tile.tile:has(input[type=radio]:focus-visible){border:2px solid var(--text)!important;outline:none!important;box-shadow:none!important}
+html:root body .modal.look.look.look .rk-mode-options button{box-sizing:border-box;border-width:2px!important;outline:none!important;box-shadow:none!important}
+html:root body .modal.look.look.look .rk-mode-options button[aria-pressed=true]{border:2px solid var(--text)!important;outline:none!important;box-shadow:none!important;background:var(--bg)!important;color:var(--text)!important}
 `;document.head.appendChild(style);
 const palettes={base:['#262626','#E5E0CF','#723424','#5D6444','#516D79','#AC6F40'],indigo:['#131316','#B4D2EE','#424185','#4453A4','#E2BF7B','#E1A656'],terra:['#151315','#D0B78E','#B05721','#746A2C','#46374A','#B05721']};
 function userId(){return window.RK_CLOUD&&window.RK_CLOUD.user&&window.RK_CLOUD.user.id;}
@@ -62,7 +65,7 @@ function sync(){
  const k=userId()?'rk:beta-background:v1:'+userId()+':'+sid:'';if(k!==activeKey){activeKey=k;color=null;try{const raw=k&&localStorage.getItem(k);if(/^#[0-9a-f]{6}$/i.test(raw||''))color=raw;}catch(e){}}
  const old=root.querySelector('#rkBetaTheme');if(old)control(old);
  const brand=root.querySelector('.rk-beta-brand'),reference=document.querySelector('#side .brand-t');if(brand&&reference&&!brand.dataset.uiMatched){const cs=getComputedStyle(reference);['fontFamily','fontSize','fontWeight','letterSpacing','textTransform','lineHeight'].forEach(p=>brand.style[p]=cs[p]);brand.dataset.uiMatched='1';}
- const dialog=document.getElementById('rkBetaLook'),out=root.querySelector('#rkBetaOut');if(dialog&&out&&!dialog.querySelector('[data-beta-signout]')){const foot=dialog.querySelector('.dlgbox-foot');if(foot){const b=document.createElement('button');b.type='button';b.className='link-btn';b.dataset.betaSignout='1';b.textContent='Выйти из аккаунта';b.onclick=()=>out.click();foot.appendChild(b);}}background();
+ document.querySelectorAll('#rkBetaLook [data-beta-signout]').forEach(b=>b.remove());background();
 }
 function schedule(){if(!frame)frame=requestAnimationFrame(()=>{frame=0;sync();});}
 new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true});
