@@ -1,0 +1,34 @@
+name: Install manual beta publication
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/manual-beta-publication.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: install-manual-beta-publication
+  cancel-in-progress: false
+jobs:
+  install:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply source-locked patch
+        run: python scripts/manual_beta_patch.py
+      - name: Check JavaScript syntax
+        run: |
+          node --check beta.js
+          node --check sw.js
+      - name: Commit only the application patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add beta.js sw.js
+          git diff --cached --quiet && exit 0
+          git commit -m 'Require explicit publication of beta chapters and author comments'
+          git push origin HEAD:main
