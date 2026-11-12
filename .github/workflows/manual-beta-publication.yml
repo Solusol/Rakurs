@@ -4,6 +4,7 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/manual-beta-publication.yml'
+      - 'scripts/manual_beta_patch.py'
   workflow_dispatch:
 permissions:
   contents: write

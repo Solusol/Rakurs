@@ -1,6 +1,6 @@
 from pathlib import Path
 import hashlib, re, subprocess
-EXPECTED_BETA = 'e72ad14be64eff33821ba5dcec7a9fa8be3d4210'
+EXPECTED_BETA = 'a3fb737256b7657da4a8e39685f3cb7e50f3aec3'
 EXPECTED_SW = '47462f30c2b74e52cc14ec15b4d68a814856a559'
 
 def blob(data):
