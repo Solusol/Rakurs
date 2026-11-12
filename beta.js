@@ -151,11 +151,12 @@ function threadCard(t,ctx){
   const c=t.root; const box=document.createElement('div'); box.className='rk-bc-thread'+(c.done?' done':''); box.dataset.id=c.id; box.style.setProperty('--bc',ctx.colors[c.role]||ctx.colors.editor); box.contentEditable='false';
   const msg=(m,root)=>`<div class="rk-bc-msg${root?' root':''}" style="--bc:${esc(ctx.colors[m.role]||ctx.colors.editor)}"><div class="rk-bc-meta"><span class="rk-bc-who">${m.role==='author'?'Автор':'Бета'}${m.role==='editor'&&m.author_name?' · '+esc(m.author_name):''}</span><span class="rk-bc-when">${esc(when(m.created_at))}</span>${root&&m.done?'<span class="rk-bc-when">· решено</span>':''}</div>${root&&m.quote?`<div class="rk-bc-q" title="К фрагменту">«${esc(m.quote.length>220?m.quote.slice(0,220)+'…':m.quote)}»</div>`:''}<div class="rk-bc-text">${esc(m.body)}</div>${!root&&m.author_id===ctx.uid?`<div class="rk-bc-actions"><button type="button" data-del="${m.id}">Удалить</button></div>`:''}</div>`;
   box.innerHTML=msg(c,true)+(t.replies.length?`<div class="rk-bc-replies">${t.replies.map(r=>msg(r,false)).join('')}</div>`:'')+`<div class="rk-bc-actions rk-bc-root-actions"><button type="button" data-reply>Ответить</button>${ctx.canResolve?`<button type="button" data-done>${c.done?'Вернуть в работу':'Решено'}</button>`:''}${c.author_id===ctx.uid?`<button type="button" data-del="${c.id}">Удалить</button>`:''}</div>`;
+  attachPublishButtons(box,t,ctx);
   box.addEventListener('mousedown',e=>e.stopPropagation());
   box.querySelectorAll('[data-del]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); if(!confirm('Удалить комментарий?')) return; ctx.onDelete(b.dataset.del); });
   const dn=box.querySelector('[data-done]'); if(dn) dn.onclick=e=>{ e.stopPropagation(); ctx.onDone(c); };
   const q=box.querySelector('.rk-bc-q'); if(q) q.onclick=e=>{ e.stopPropagation(); const m=document.querySelector('mark.rk-bc-mark[data-bc="'+CSS_escape(c.id)+'"]'); if(m){ m.scrollIntoView({block:'center',behavior:'smooth'}); m.classList.add('hot'); setTimeout(()=>m.classList.remove('hot'),1600); } };
-  box.querySelector('[data-reply]').onclick=e=>{ e.stopPropagation(); if(box.querySelector('.rk-bc-compose')) return; const f=composer({placeholder:'Ответ…',ok:'Отправить',onOk:async text=>{ await ctx.onReply(c,text); },onCancel:()=>f.remove()}); box.appendChild(f); f.querySelector('textarea').focus(); };
+  box.querySelector('[data-reply]').onclick=e=>{ e.stopPropagation(); if(box.querySelector('.rk-bc-compose')) return; const f=composer({placeholder:'Ответ…',ok:ctx.role==='author'?'Сохранить':'Отправить',onOk:async text=>{ await ctx.onReply(c,text); },onCancel:()=>f.remove()}); box.appendChild(f); f.querySelector('textarea').focus(); };
   box.addEventListener('mouseenter',()=>document.querySelectorAll('mark.rk-bc-mark[data-bc="'+CSS_escape(c.id)+'"]').forEach(m=>m.classList.add('hot')));
   box.addEventListener('mouseleave',()=>document.querySelectorAll('mark.rk-bc-mark[data-bc="'+CSS_escape(c.id)+'"]').forEach(m=>m.classList.remove('hot')));
   return box;
@@ -311,12 +312,24 @@ function filterBar(state,onChange,extra){
 function visibleThreads(threads,state){ return threads.filter(t=>(state.showDone||!t.root.done)&&(state.filter==='all'||t.root.role===state.filter)); }
 
 /* ---------- данные: запросы к облаку ---------- */
+/* MANUAL_BETA_PUBLICATION_V1: drafts stay in the owner's project, never in rk_comments. */
+const manualIcon='<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5"/><path d="M6.1 8a7 7 0 0 1 11.6-3L20 8M4 16l2.3 3A7 7 0 0 0 17.9 16"/></svg>';
+const manualStyle=document.createElement('style');manualStyle.textContent='.rk-manual-publish{display:inline-flex!important;align-items:center;justify-content:center;flex:0 0 28px;width:28px!important;height:28px!important;min-width:28px!important;padding:4px!important;background:transparent!important;color:inherit!important;border:0!important;cursor:pointer}.rk-manual-publish:focus-visible{outline:2px solid currentColor!important;outline-offset:2px}.rk-manual-publish[disabled]{opacity:.5;cursor:default}.rk-manual-publish[data-state=pending]{outline:1px dashed currentColor;outline-offset:1px}.rk-share-item{position:relative;padding-right:48px}.rk-share-item>.rk-manual-publish{position:absolute;right:10px;top:10px}';document.head.appendChild(manualStyle);
+function manualWorkspace(write=false){const b=window.RK_BETA_BRIDGE;if(betaMatch||!b||!user())throw Error('Открой проект автора');if(write&&document.body.classList.contains('tab-readonly'))throw Error('Это окно только для чтения');return b.wsData();}
+function privateComments(){return manualWorkspace().betaPrivateComments||[];}
+function savePrivate(list){manualWorkspace(true).betaPrivateComments=list;window.RK_BETA_BRIDGE.save();}
+function privateById(id){if(betaMatch||!window.RK_BETA_BRIDGE||!user())return null;return privateComments().find(c=>c.id===id&&c.author_id===user().id);}
+function draftComment(row){if(row.owner_id!==user()?.id||row.author_id!==user()?.id)throw Error('Неверный аккаунт комментария');const c={...row,id:crypto.randomUUID(),done:false,created_at:new Date().toISOString(),_private:true};savePrivate([...privateComments(),c]);return c;}
+async function publishPrivate(c){if(!c._private||c.author_id!==user()?.id)throw Error('Нет личного черновика');if(c.parent_id&&privateById(c.parent_id))throw Error('Сначала отправь родительский комментарий');const workspace=manualWorkspace(),account=user().id,row={...c};delete row._private;const {error}=await sb().from('rk_comments').upsert(row,{onConflict:'id'});if(error)throw error;if(user()?.id!==account||manualWorkspace()!==workspace)throw Error('Аккаунт или проект изменился; проверь статус отправки');savePrivate(privateComments().filter(x=>x.id!==c.id));}
+function manualButton(title){const b=document.createElement('button');b.type='button';b.className='rk-manual-publish';b.title=title;b.setAttribute('aria-label',title);b.innerHTML=manualIcon;return b;}
+function attachPublishButtons(box,t,ctx){if(ctx.role!=='author')return;const messages=[t.root,...t.replies];box.querySelectorAll('.rk-bc-msg').forEach((node,i)=>{const c=messages[i];if(c?.role!=='author'||c.author_id!==ctx.uid)return;const b=manualButton(c._private?'Отправить комментарий бете — пока виден только тебе':'Комментарий уже отправлен бете');b.dataset.state=c._private?'pending':'sent';b.disabled=!c._private;b.onclick=async e=>{e.stopPropagation();b.disabled=true;try{await ctx.onPublish(c);}catch(err){toast(humanErr(err));if(b.isConnected)b.disabled=false;}};node.querySelector('.rk-bc-meta').appendChild(b);});}
+
 const api={
   async shares(ownerId,projectId){ const {data,error}=await sb().from('rk_shares').select('*').eq('owner_id',ownerId).eq('project_id',projectId).order('created_at'); if(error) throw error; return data||[]; },
-  async comments(where){ let q=sb().from('rk_comments').select('*'); for(const k in where){ if(Array.isArray(where[k])) q=q.in(k,where[k]); else q=q.eq(k,where[k]); } const {data,error}=await q.order('created_at'); if(error) throw error; return data||[]; },
-  async insertComment(row){ const {data,error}=await sb().from('rk_comments').insert(row).select('*').single(); if(error) throw error; return data; },
-  async setDone(id,done){ const {error}=await sb().from('rk_comments').update({done}).eq('id',id); if(error) throw error; },
-  async deleteComment(id){ const {error}=await sb().from('rk_comments').delete().eq('id',id); if(error) throw error; }
+  async comments(where){ let q=sb().from('rk_comments').select('*'); for(const k in where){ if(Array.isArray(where[k])) q=q.in(k,where[k]); else q=q.eq(k,where[k]); } const {data,error}=await q.order('created_at'); if(error) throw error; if(!betaMatch&&where.owner_id===user()?.id){return (data||[]).concat(privateComments().filter(c=>c.author_id===user().id&&Object.entries(where).every(([k,v])=>Array.isArray(v)?v.includes(c[k]):c[k]===v)));} return data||[]; },
+  async insertComment(row){ if(!betaMatch&&row.role==='author')return draftComment(row); const {data,error}=await sb().from('rk_comments').insert(row).select('*').single(); if(error) throw error; return data; },
+  async setDone(id,done){ const draft=privateById(id);if(draft){savePrivate(privateComments().map(c=>c.id===id?{...c,done}:c));return;} const {error}=await sb().from('rk_comments').update({done}).eq('id',id); if(error) throw error; },
+  async deleteComment(id){ const draft=privateById(id);if(draft){savePrivate(privateComments().filter(c=>c.id!==id).map(c=>c.parent_id===id?{...c,parent_id:null}:c));return;} const {error}=await sb().from('rk_comments').delete().eq('id',id); if(error) throw error; }
 };
 
 /* =====================================================================
@@ -339,9 +352,48 @@ function authorSide(){
   /* --- копия главы в облаке --- */
   function chapterPayload(p){ const blocks=B().pageBlocks(p).filter(b=>!b.deleted).map(b=>{ let h=String(b.h==null?'':b.h); if(h.length>400000) h='<p class="muted">[вложение не передаётся бете]</p>'; return {id:b.id,t:b.t,h}; }); return {title:p.title,sub:p.sub||'',blocks,updated:Date.now()}; }
   async function pushChapters(ids){ if(!ready()) return; const rows=[]; ids.forEach(id=>{ const p=B().PAGE[id]; if(!p) return; const d=chapterPayload(p); rows.push({owner_id:user().id,project_id:projectId(),page_id:id,title:p.title,data:JSON.stringify(d),updated:d.updated}); }); if(!rows.length) return; const {error}=await sb().from('rk_chapters').upsert(rows,{onConflict:'owner_id,project_id,page_id'}); if(error) throw error; }
-  function queuePush(id){ if(!id) return; pushQueue.add(id); clearTimeout(pushTimer); pushTimer=setTimeout(async()=>{ const ids=[...pushQueue]; pushQueue.clear(); try{ await pushChapters(ids); }catch(e){ console.warn('beta push',e); } },2000); }
-  function onFlush(){ if(!ready()||!shares) return; const cp=B().curPage; if(cp&&activeSharesForPage(cp.id).length) queuePush(cp.id); }
-  async function pushAllShared(){ try{ await loadShares(); const ids=new Set(); (shares||[]).filter(s=>s.active).forEach(s=>(s.chapters||[]).forEach(id=>ids.add(id))); if(ids.size) await pushChapters([...ids]); }catch(e){ console.warn('beta push all',e); } }
+  function queuePush(id){}
+  function onFlush(){}
+  async function pushAllShared(){await loadShares();}
+
+
+  /* Manual publication only. Existing rk_chapters snapshots are shared by overlapping links. */
+  async function publishShare(s,button,say){
+    if(!ready()||!s.active)return;
+    const affected=(shares||[]).filter(x=>x.active&&x.id!==s.id&&(x.chapters||[]).some(id=>(s.chapters||[]).includes(id)));
+    if(affected.length&&!confirm('Эти главы также открыты другим бетам: '+affected.map(x=>x.editor_email).join(', ')+'. Их копии этих глав тоже обновятся. Отправить?'))return;
+    const account=user().id,project=projectId();button.disabled=true;
+    try{await pushChapters(s.chapters||[]);if(user()?.id!==account||projectId()!==project)throw Error('Аккаунт или проект изменился');const {error}=await sb().from('rk_shares').update({colors:colors()}).eq('id',s.id).eq('owner_id',account);if(error)throw error;button.dataset.state='sent';button.title='Главы отправлены бете';say('Главы отправлены бете. Личные комментарии не отправлялись.');}
+    catch(e){button.dataset.state='pending';say(humanErr(e),true);}finally{if(button.isConnected)button.disabled=false;}
+  }
+  function legacySource(node,p){
+    if(node.querySelector('textarea'))return null;
+    const text=node.querySelector('.txt')?.textContent.trim(),bid=node.closest('.blk')?.dataset.id;if(!text||!bid)return null;
+    const d=B().D,anns=Object.values(d.anns||{}).filter(a=>a.b1===bid&&(!a.pid||a.pid===p.id)&&String(a.text||'').trim()===text);
+    if(anns.length===1){const a=anns[0];return {key:'ann:'+a.id,row:{body:a.text,block_id:a.b1,quote:a.q||'',o1:a.o1,o2:a.b1===a.b2?a.o2:null}};}
+    const n=d.notes?.[bid],body=typeof n==='string'?n:n?.text;
+    if(body&&String(body).trim()===text&&!anns.length)return {key:'note:'+bid,row:{body,block_id:bid}};
+    return null;
+  }
+  function decorateLegacy(){
+    if(!ready())return;
+    document.querySelectorAll(':is(#view,#view2Body) .noteslot .note').forEach(node=>{
+      let b=node.querySelector('[data-manual-legacy]');if(b)return;
+      b=manualButton('Отправить сохранённый комментарий бете');b.dataset.manualLegacy='1';b.dataset.state='pending';
+      b.onclick=async e=>{e.preventDefault();e.stopPropagation();const p=B().curPage,source=legacySource(node,p);if(!source){toast('Сначала сохрани комментарий. Если заметка не определилась однозначно, отправка отменена.');return;}
+        b.disabled=true;
+        try{await loadShares(true);if(!node.closest('#view'))throw Error('Отправляй заметку с основной страницы');const list=activeSharesForPage(p.id);if(!list.length)throw Error('Для главы нет активной ссылки беты');let target=list[0];if(list.length>1){const choice=prompt('Выбери номер беты:\n'+list.map((x,i)=>(i+1)+'. '+x.editor_email).join('\n'),'1');if(choice===null)return;target=list[Number(choice)-1];if(!target)throw Error('Неверный номер беты');}
+          const ws=manualWorkspace(true),key=user().id+':'+p.id+':'+source.key+':'+target.id,previous=ws.betaPublishedNotes?.[key];
+          const row={...source.row,id:previous?.id||crypto.randomUUID(),share_id:target.id,owner_id:user().id,page_id:p.id,role:'author',author_id:user().id,author_name:'Автор',done:false};
+          const {error}=await sb().from('rk_comments').upsert(row,{onConflict:'id'});if(error)throw error;
+          ws.betaPublishedNotes=ws.betaPublishedNotes||{};ws.betaPublishedNotes[key]={id:row.id,body:row.body,ts:Date.now()};B().save();b.dataset.state='sent';toast('Комментарий отправлен бете');await decorate(p,document.getElementById('view'),true);
+        }catch(err){toast(humanErr(err));}finally{if(b.isConnected)b.disabled=false;}
+      };
+      const source=legacySource(node,B().curPage);if(source){const sent=Object.entries(manualWorkspace().betaPublishedNotes||{}).some(([k,v])=>k.startsWith(user().id+':'+B().curPage.id+':'+source.key+':')&&v.body===source.row.body);if(sent){b.dataset.state='sent';b.title='Эта редакция уже отправлена хотя бы одной бете. Нажми для выбора получателя и повторной отправки.';}}
+      node.appendChild(b);
+    });
+  }
+  let legacyFrame=0;new MutationObserver(()=>{if(!legacyFrame)legacyFrame=requestAnimationFrame(()=>{legacyFrame=0;decorateLegacy();});}).observe(document.body,{childList:true,subtree:true});
 
   /* --- окно «Доступ для беты» --- */
   async function openShareDialog(book){
@@ -364,7 +416,7 @@ function authorSide(){
       const chaptersHTML=`<div class="rk-share-tools"><button type="button" class="btn" data-all>Выбрать все</button><button type="button" class="btn" data-none>Снять выбор</button></div>
         <div class="rk-share-chapters">${chapterList().map(x=>`<label class="${x.book?'rk-share-book':'rk-share-chapter'}"><input type="checkbox" value="${esc(x.p.id)}"${checked.has(x.p.id)?' checked':''}><span>${esc(x.p.title)}</span></label>`).join('')}</div>`;
       const colorsHTML=`<div class="field"><label>Цвета комментариев</label><div class="rk-share-colors">${[['author','Автор'],['editor','Бета']].map(([k,l])=>`<div class="rk-share-color-row"><span>${l}</span>${pal.map(c=>`<button type="button" class="rk-share-swatch" data-role="${k}" data-color="${c}" style="background:${c}" aria-pressed="${(col[k]||'').toLowerCase()===c.toLowerCase()}" title="${c}"></button>`).join('')}</div>`).join('')}</div></div>`;
-      const existing=bookShares.length?`<div class="field"><label>Ссылки</label><div class="rk-share-list">${bookShares.map(s=>`<div class="rk-share-item${s.active?'':' off'}" data-id="${s.id}"><div class="rk-share-head"><b>${esc(s.editor_email)}</b><span class="muted">${(s.chapters||[]).length} ${plural((s.chapters||[]).length,'глава','главы','глав')} · ${s.active?(s.editor_id?'открыта бетой':'ждёт первого входа'):'отключена'}</span></div><div class="row-btns"><button type="button" class="link-btn" data-copy="${s.id}">Копировать ссылку</button><button type="button" class="link-btn" data-edit="${s.id}">Главы</button><button type="button" class="link-btn" data-toggle="${s.id}">${s.active?'Отключить':'Включить'}</button><button type="button" class="link-btn" data-remove="${s.id}">Удалить</button></div></div>`).join('')}</div></div>`:'';
+      const existing=bookShares.length?`<div class="field"><label>Ссылки</label><div class="rk-share-list">${bookShares.map(s=>`<div class="rk-share-item${s.active?'':' off'}" data-id="${s.id}"><button type="button" class="rk-manual-publish" data-publish-share="${s.id}" title="Отправить текущую версию глав бете" aria-label="Отправить текущую версию глав бете"${s.active?'':' disabled'}>${manualIcon}</button><div class="rk-share-head"><b>${esc(s.editor_email)}</b><span class="muted">${(s.chapters||[]).length} ${plural((s.chapters||[]).length,'глава','главы','глав')} · ${s.active?(s.editor_id?'открыта бетой':'ждёт первого входа'):'отключена'}</span></div><div class="row-btns"><button type="button" class="link-btn" data-copy="${s.id}">Копировать ссылку</button><button type="button" class="link-btn" data-edit="${s.id}">Главы</button><button type="button" class="link-btn" data-toggle="${s.id}">${s.active?'Отключить':'Включить'}</button><button type="button" class="link-btn" data-remove="${s.id}">Удалить</button></div></div>`).join('')}</div></div>`:'';
       m.innerHTML=`<div class="dlgbox"><div class="dlgbox-head"><h3>Доступ для беты</h3><button class="icon-btn" type="button" data-close>✕</button></div>
         <div class="dlgbox-body">
           ${err?`<p class="muted" style="color:var(--rk-hover,var(--heading))">${esc(err)}</p>`:''}
@@ -379,13 +431,14 @@ function authorSide(){
       const boxes=()=>[...m.querySelectorAll('.rk-share-chapters input')];
       m.querySelector('[data-all]').onclick=()=>boxes().forEach(b=>b.checked=true);
       m.querySelector('[data-none]').onclick=()=>boxes().forEach(b=>b.checked=false);
-      m.querySelectorAll('.rk-share-swatch').forEach(b=>b.onclick=async()=>{ const ws=B().wsData(); ws.betaColors=Object.assign({},colors(),{[b.dataset.role]:b.dataset.color}); B().save(); m.querySelectorAll(`.rk-share-swatch[data-role="${b.dataset.role}"]`).forEach(x=>x.setAttribute('aria-pressed',String(x===b))); try{ const all=list.filter(s=>s.owner_id===user().id); if(all.length){ const {error}=await sb().from('rk_shares').update({colors:ws.betaColors}).eq('owner_id',user().id).eq('project_id',projectId()); if(error) throw error; } }catch(e){ say(humanErr(e),true); } decorateCurrent(true); });
+      m.querySelectorAll('.rk-share-swatch').forEach(b=>b.onclick=()=>{const ws=B().wsData();ws.betaColors=Object.assign({},colors(),{[b.dataset.role]:b.dataset.color});B().save();m.querySelectorAll(`.rk-share-swatch[data-role="${b.dataset.role}"]`).forEach(x=>x.setAttribute('aria-pressed',String(x===b)));say('Цвет сохранён у автора. Для беты отправь обновление кнопкой в карточке ссылки.');decorateCurrent(true);});
+      m.querySelectorAll('[data-publish-share]').forEach(b=>b.onclick=()=>publishShare(list.find(x=>x.id===b.dataset.publishShare),b,say));
       m.querySelectorAll('[data-copy]').forEach(b=>b.onclick=async()=>{ const ok=await copyText(linkFor(b.dataset.copy)); say(ok?'Ссылка скопирована':linkFor(b.dataset.copy),!ok); });
       m.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>render(list.find(s=>s.id===b.dataset.edit)));
-      m.querySelectorAll('[data-toggle]').forEach(b=>b.onclick=async()=>{ const s=list.find(x=>x.id===b.dataset.toggle); if(!s) return; try{ const {error}=await sb().from('rk_shares').update({active:!s.active}).eq('id',s.id); if(error) throw error; if(!s.active) await pushChapters(s.chapters||[]); await render(null,s.active?'Ссылка отключена':'Ссылка включена'); decorateCurrent(true); }catch(e){ say(humanErr(e),true); } });
+      m.querySelectorAll('[data-toggle]').forEach(b=>b.onclick=async()=>{ const s=list.find(x=>x.id===b.dataset.toggle); if(!s) return; try{ const {error}=await sb().from('rk_shares').update({active:!s.active}).eq('id',s.id); if(error) throw error; await render(null,s.active?'Ссылка отключена':'Ссылка включена'); decorateCurrent(true); }catch(e){ say(humanErr(e),true); } });
       m.querySelectorAll('[data-remove]').forEach(b=>b.onclick=async()=>{ const s=list.find(x=>x.id===b.dataset.remove); if(!s) return; if(!confirm('Удалить ссылку для '+s.editor_email+'? Комментарии этой беты тоже удалятся.')) return; try{ const {error}=await sb().from('rk_shares').delete().eq('id',s.id); if(error) throw error; await render(null,'Ссылка удалена'); decorateCurrent(true); }catch(e){ say(humanErr(e),true); } });
       const back=m.querySelector('[data-back]'); if(back) back.onclick=()=>render(null);
-      const save=m.querySelector('[data-save]'); if(save) save.onclick=async()=>{ const ids=boxes().filter(b=>b.checked).map(b=>b.value); if(!ids.length){ say('Выбери хотя бы одну главу',true); return; } save.disabled=true; try{ const {error}=await sb().from('rk_shares').update({chapters:ids,book_title:book.title}).eq('id',editing.id); if(error) throw error; await pushChapters(ids); await render(null,'Список глав обновлён'); decorateCurrent(true); }catch(e){ save.disabled=false; say(humanErr(e),true); } };
+      const save=m.querySelector('[data-save]'); if(save) save.onclick=async()=>{ const ids=boxes().filter(b=>b.checked).map(b=>b.value); if(!ids.length){ say('Выбери хотя бы одну главу',true); return; } save.disabled=true; try{ const {error}=await sb().from('rk_shares').update({chapters:ids,book_title:book.title}).eq('id',editing.id); if(error) throw error; await render(null,'Список глав обновлён. Отправь их бете кнопкой обновления в карточке ссылки.'); decorateCurrent(true); }catch(e){ save.disabled=false; say(humanErr(e),true); } };
       const create=m.querySelector('[data-create]'); if(create) create.onclick=async()=>{
         const email=(m.querySelector('#rkShareEmail').value||'').trim().toLowerCase(); const ids=boxes().filter(b=>b.checked).map(b=>b.value);
         if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ say('Укажи почту беты',true); m.querySelector('#rkShareEmail').focus(); return; }
@@ -396,9 +449,9 @@ function authorSide(){
           const look=Object.assign({palette:'base'},B().curProject.look||{});
           const row={owner_id:user().id,project_id:projectId(),book_id:book.id,book_title:book.title,editor_email:email,chapters:ids,active:true,look,colors:colors()};
           const {data,error}=await sb().from('rk_shares').insert(row).select('id').single(); if(error) throw error;
-          await pushChapters(ids);
+          /* First publication also requires the explicit refresh icon. */
           const link=linkFor(data.id); const ok=await copyText(link);
-          await render(null,ok?'Ссылка создана и скопирована — отправь её бете. Открыть её сможет только аккаунт с почтой '+email:'Ссылка создана: '+link);
+          await render(null,ok?'Ссылка создана и скопирована. Сначала отправь главы кнопкой обновления в карточке ссылки, затем отправь ссылку бете. Открыть её сможет только аккаунт с почтой '+email:'Ссылка создана: '+link);
           decorateCurrent(true);
         }catch(e){ create.disabled=false; say(humanErr(e),true); }
       };
@@ -421,7 +474,7 @@ function authorSide(){
     if(B().curPage!==p||!host.isConnected) return;
     const threads=threadsOf(list); state.doneCount=threads.filter(t=>t.root.done).length;
     const col=colors(); const me=user().id; const shown=visibleThreads(threads,state);
-    const ctx={role:'author',uid:me,colors:col,canResolve:true,
+    const ctx={role:'author',uid:me,colors:col,canResolve:true,onPublish:async c=>{await publishPrivate(c);await decorate(p,host,true);},
       onReply:async(root,text)=>{ await api.insertComment({share_id:root.share_id,owner_id:me,page_id:p.id,parent_id:root.id,body:text,role:'author',author_id:me,author_name:'Автор'}); await decorate(p,host,true); },
       onDone:async root=>{ try{ await api.setDone(root.id,!root.done); await decorate(p,host,true); }catch(e){ toast(humanErr(e)); } },
       onDelete:async id=>{ try{ await api.deleteComment(id); await decorate(p,host,true); }catch(e){ toast(humanErr(e)); } }};
@@ -434,7 +487,7 @@ function authorSide(){
         const btn=document.createElement('button'); btn.type='button'; btn.className='btn'; btn.textContent='Комментарий к главе'; btn.disabled=!active.length; btn.title=active.length?'':'Нет активных ссылок для этой главы';
         const bar=filterBar(state,()=>decorate(p,host,false),btn);
         const gen=document.createElement('div'); gen.className='rk-bc-general'; gen.contentEditable='false';
-        btn.onclick=()=>{ if(gen.querySelector('.rk-bc-compose')) return; const f=composer({placeholder:'Комментарий ко всей главе…',shares:active.map(s=>({id:s.id,label:s.editor_email})),onOk:async(text,sid)=>{ await api.insertComment({share_id:sid,owner_id:me,page_id:p.id,body:text,role:'author',author_id:me,author_name:'Автор'}); await decorate(p,host,true); },onCancel:()=>f.remove()}); gen.prepend(f); f.querySelector('textarea').focus(); };
+        btn.onclick=()=>{ if(gen.querySelector('.rk-bc-compose')) return; const f=composer({ok:'Сохранить',placeholder:'Комментарий ко всей главе…',shares:active.map(s=>({id:s.id,label:s.editor_email})),onOk:async(text,sid)=>{ await api.insertComment({share_id:sid,owner_id:me,page_id:p.id,body:text,role:'author',author_id:me,author_name:'Автор'}); await decorate(p,host,true); },onCancel:()=>f.remove()}); gen.prepend(f); f.querySelector('textarea').focus(); };
         shown.filter(t=>!t.root.block_id).forEach(t=>gen.appendChild(threadCard(t,ctx)));
         head.after(bar,gen);
       }
@@ -467,7 +520,7 @@ function authorSide(){
     let slot=el.querySelector('.rk-bc-slot'); if(!slot){ slot=document.createElement('div'); slot.className='rk-bc-slot'; slot.contentEditable='false'; slotHost(el,B().mode==='edit').appendChild(slot); }
     if(slot.querySelector('.rk-bc-compose')) return;
     const active=activeSharesForPage(cp.id); const me=user().id;
-    const f=composer({quote:s.quote,placeholder:'Комментарий к фрагменту…',shares:active.map(x=>({id:x.id,label:x.editor_email})),onOk:async(text,sid)=>{ await api.insertComment({share_id:sid,owner_id:me,page_id:cp.id,block_id:s.block_id,o1:s.o1,o2:s.o2,quote:s.quote,body:text,role:'author',author_id:me,author_name:'Автор'}); await decorate(cp,host,true); },onCancel:()=>{ f.remove(); if(!slot.children.length) slot.remove(); }});
+    const f=composer({ok:'Сохранить',quote:s.quote,placeholder:'Комментарий к фрагменту…',shares:active.map(x=>({id:x.id,label:x.editor_email})),onOk:async(text,sid)=>{ await api.insertComment({share_id:sid,owner_id:me,page_id:cp.id,block_id:s.block_id,o1:s.o1,o2:s.o2,quote:s.quote,body:text,role:'author',author_id:me,author_name:'Автор'}); await decorate(cp,host,true); },onCancel:()=>{ f.remove(); if(!slot.children.length) slot.remove(); }});
     slot.prepend(f); f.querySelector('textarea').focus();
   }
   let selT=null; document.addEventListener('selectionchange',()=>{ clearTimeout(selT); selT=setTimeout(checkSelection,160); });
