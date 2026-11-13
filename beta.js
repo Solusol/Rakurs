@@ -225,7 +225,7 @@ const commentControls=new WeakMap();
 function commentPreferenceKey(){return 'rk:comments-layout:v1:'+(user()?.id||'local')+':'+(betaMatch?betaMatch[1]:'author');}
 const commentLayouts=new Map();
 let commentLayoutFrame=0;
-let activeCommentId='';
+let activeCommentId='',pinnedCommentId='';
 const commentObserved=new Set();
 const commentResize=window.ResizeObserver?new ResizeObserver(scheduleCommentLayouts):null;
 function scheduleCommentLayouts(){
@@ -237,14 +237,20 @@ function applyCommentLayout(bar,state){
     if(host){commentLayouts.set(host,{bar,state});scheduleCommentLayouts();}
   });
 }
-function packCommentCards(items,activeId,viewportTop,textBottom){
-  let bottom=0;
-  return items.map(item=>{
-    let target=item.anchor;
-    const top=Math.max(0,target,bottom);
-    bottom=top+item.height+12;
-    return {...item,top};
-  });
+/* Клик по выделению: в боковой раскладке карточка сама встает на уровень фрагмента, страница не двигается; внизу — минимальная прокрутка, только если карточка вне экрана. */
+function revealCard(card){ requestAnimationFrame(()=>requestAnimationFrame(()=>{ if(!card.isConnected) return; const r=card.getBoundingClientRect(); const top=(document.querySelector(document.body.classList.contains('rk-beta-mode')?'.rk-beta-bar':'.bar')?.getBoundingClientRect().bottom)||0; if(r.top>=top&&r.bottom<=innerHeight) return; if(card.closest('.rk-unified-side,.rk-bc-sideview')&&r.top<innerHeight&&r.bottom>top) return; card.scrollIntoView({block:'nearest',behavior:'smooth'}); })); }
+function packCommentCards(items,pinned){
+ /* Карточки стоят у своих фрагментов. Клик по выделению в тексте ставит его карточку точно на уровень фрагмента (соседи раздвигаются вверх и вниз); клик по самой карточке ее не двигает. */
+ let bottom=0;
+ const out=items.map(item=>{const top=Math.max(0,item.anchor,bottom);bottom=top+item.height+12;return {...item,top};});
+ const i=pinned?out.findIndex(x=>x.id===pinned):-1;
+ if(i<0)return out;
+ out[i].top=Math.max(0,out[i].anchor);
+ bottom=out[i].top+out[i].height+12;
+ for(let j=i+1;j<out.length;j++){out[j].top=Math.max(out[j].anchor,bottom);bottom=out[j].top+out[j].height+12;}
+ let limit=out[i].top-12;
+ for(let j=i-1;j>=0;j--){out[j].top=Math.min(out[j].top,limit-out[j].height);limit=out[j].top-12;}
+ return out;
 }
 function updateCommentLayouts(){
   const observe=new Set();
@@ -271,7 +277,7 @@ function updateCommentLayouts(){
       const anchor=marks.get(id)||card.closest('.blk')?.querySelector(':scope > .body')||blocks;
       return {card,id,index,anchor:Math.max(0,anchor.getBoundingClientRect().top-origin),height:card.getBoundingClientRect().height};
     }).sort((a,b)=>a.anchor-b.anchor||a.index-b.index);
-    const packed=packCommentCards(items,activeCommentId,barBottom+12-origin,textBottom);
+    const packed=packCommentCards(items,pinnedCommentId);
     let last=textBottom;
     packed.forEach(item=>{
       const value=item.top.toFixed(2)+'px';
@@ -290,13 +296,13 @@ function selectCommentLayoutTarget(e){
   const target=e.target instanceof Element?e.target:null;
   const mark=target?.closest('mark.rk-bc-mark');
   const card=target?.closest('.rk-bc-thread');
-  if(mark||card){activeCommentId=mark?.dataset.bc||card.dataset.id;scheduleCommentLayouts();}
+  if(mark||card){activeCommentId=mark?.dataset.bc||card.dataset.id;if(mark)pinnedCommentId=mark.dataset.bc;scheduleCommentLayouts();}
 }
 document.addEventListener('pointerdown',selectCommentLayoutTarget,true);
 document.addEventListener('focusin',selectCommentLayoutTarget,true);
 document.addEventListener('scroll',scheduleCommentLayouts,{capture:true,passive:true});
 window.addEventListener('resize',scheduleCommentLayouts,{passive:true});
-window.addEventListener('hashchange',()=>{activeCommentId='';scheduleCommentLayouts();});
+window.addEventListener('hashchange',()=>{activeCommentId='';pinnedCommentId='';scheduleCommentLayouts();});
 document.addEventListener('change',scheduleCommentLayouts);
 document.addEventListener('load',scheduleCommentLayouts,true);
 new MutationObserver(scheduleCommentLayouts).observe(document.body,{childList:true,subtree:true,characterData:true});
@@ -566,7 +572,7 @@ function authorSide(){
   }
   let selT=null; document.addEventListener('selectionchange',()=>{ clearTimeout(selT); selT=setTimeout(checkSelection,160); });
   window.addEventListener('scroll',()=>{ if(bubble&&!bubble.hidden) checkSelection(); },{passive:true});
-  document.addEventListener('click',e=>{ const m=e.target.closest&&e.target.closest('mark.rk-bc-mark'); if(!m) return; const sel=getSelection(); if(sel&&!sel.isCollapsed) return; const card=document.querySelector('.rk-bc-thread[data-id="'+CSS_escape(m.dataset.bc)+'"]'); if(card){ e.preventDefault(); e.stopPropagation(); card.scrollIntoView({block:'center',behavior:'smooth'}); card.classList.add('hot'); setTimeout(()=>card.classList.remove('hot'),1600); } },true);
+  document.addEventListener('click',e=>{ const m=e.target.closest&&e.target.closest('mark.rk-bc-mark'); if(!m) return; const sel=getSelection(); if(sel&&!sel.isCollapsed) return; const card=document.querySelector('.rk-bc-thread[data-id="'+CSS_escape(m.dataset.bc)+'"]'); if(card){ e.preventDefault(); e.stopPropagation(); revealCard(card); card.classList.add('hot'); setTimeout(()=>card.classList.remove('hot'),1600); } },true);
 
   /* --- опрос облака --- */
   function poll(){ clearInterval(pollTimer); pollTimer=setInterval(async()=>{ if(document.visibilityState!=='visible'||!ready()) return; const cp=B()&&B().curPage; if(!cp||!shares||!isShared(cp.id)) return; const before=JSON.stringify((comments[cp.id]||[]).map(c=>[c.id,c.done,c.body])); try{ const list=await api.comments({owner_id:user().id,page_id:cp.id}); const after=JSON.stringify(list.map(c=>[c.id,c.done,c.body])); if(after!==before&&!composing(document.getElementById('view'))){ comments[cp.id]=list; decorateCurrent(false); } }catch(e){} },45000); }
@@ -733,7 +739,7 @@ function betaScreen(shareId){
     document.addEventListener('selectionchange',()=>{ clearTimeout(selT); selT=setTimeout(check,140); });
     window.addEventListener('scroll',()=>{ if(!bubble.hidden) check(); },{passive:true});
     bubble.onclick=()=>{ const s=pending; bubble.hidden=true; pending=null; if(!s) return; try{ getSelection().removeAllRanges(); }catch(e){} const el=root.querySelector('.blk[data-id="'+CSS_escape(s.block_id)+'"]'); if(!el) return; let slot=el.querySelector('.rk-bc-slot'); if(!slot){ slot=document.createElement('div'); slot.className='rk-bc-slot'; slotHost(el,false).appendChild(slot); } if(slot.querySelector('.rk-bc-compose')) return; const f=composer({quote:s.quote,placeholder:'Комментарий к фрагменту…',onOk:async text=>{ await post({block_id:s.block_id,o1:s.o1,o2:s.o2,quote:s.quote,body:text}); },onCancel:()=>{ f.remove(); if(!slot.children.length) slot.remove(); }}); slot.prepend(f); focusComposer(f); };
-    document.addEventListener('click',e=>{ const m=e.target.closest&&e.target.closest('mark.rk-bc-mark'); if(!m) return; const sel=getSelection(); if(sel&&!sel.isCollapsed) return; const card=root.querySelector('.rk-bc-thread[data-id="'+CSS_escape(m.dataset.bc)+'"]'); if(card){ e.preventDefault(); card.scrollIntoView({block:'center',behavior:'smooth'}); card.classList.add('hot'); setTimeout(()=>card.classList.remove('hot'),1600); } },true);
+    document.addEventListener('click',e=>{ const m=e.target.closest&&e.target.closest('mark.rk-bc-mark'); if(!m) return; const sel=getSelection(); if(sel&&!sel.isCollapsed) return; const card=root.querySelector('.rk-bc-thread[data-id="'+CSS_escape(m.dataset.bc)+'"]'); if(card){ e.preventDefault(); revealCard(card); card.classList.add('hot'); setTimeout(()=>card.classList.remove('hot'),1600); } },true);
   }
   async function post(extra){ const row=Object.assign({share_id:share.id,owner_id:share.owner_id,page_id:cur.id,role:'editor',author_id:me().id,author_name:me().email||'',done:false},extra); await api.insertComment(row); await refreshComments(true); }
   async function refreshComments(silent){ if(silent&&composing(root)) return; try{ const list=await api.comments({share_id:share.id,page_id:cur.id}); const before=JSON.stringify(comments.map(c=>[c.id,c.done,c.body])); const after=JSON.stringify(list.map(c=>[c.id,c.done,c.body])); comments=list; if((after!==before||!silent)&&!(silent&&composing(root))) renderComments(); }catch(e){ if(!silent) toast(humanErr(e)); } }

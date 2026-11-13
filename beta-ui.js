@@ -81,7 +81,7 @@ document.addEventListener('click',e=>{if(menu&&!menu.hidden&&!e.target.closest('
 const ROOT=':is(#view,#view2Body,#rkBetaView)';
 const CARD='.noteslot .note,.rk-bc-slot > .rk-bc-thread,.rk-bc-general > .rk-bc-thread,.rk-bc-slot > .rk-bc-compose,.rk-bc-general > .rk-bc-compose';
 const ids=new WeakMap(),normalWidths=new WeakMap(),observed=new Set();
-let sequence=0,frame=0,active='';
+let sequence=0,frame=0,active='',pinned='';
 const resize=window.ResizeObserver?new ResizeObserver(schedule):null;
 const style=document.createElement('style');style.id='rk-unified-comments-v1';
 style.textContent=`
@@ -117,10 +117,17 @@ function sideWanted(host){
  }catch(e){}
  return host.classList.contains('rk-bc-sideview');
 }
-function pack(items,selected,viewportTop,textBottom){
+function pack(items,pinned){
+ /* Карточки стоят у своих фрагментов. Клик по выделению в тексте ставит его карточку точно на уровень фрагмента (соседи раздвигаются вверх и вниз); клик по самой карточке ее не двигает. */
  let bottom=0;
- const out=items.map(item=>{const top=Math.max(item.anchor,bottom);bottom=top+item.height+12;return {...item,top};});
- /* Карточки стоят у своих фрагментов и не прыгают при клике: активная карточка только подсвечивается. */
+ const out=items.map(item=>{const top=Math.max(0,item.anchor,bottom);bottom=top+item.height+12;return {...item,top};});
+ const i=pinned?out.findIndex(x=>x.key===pinned):-1;
+ if(i<0)return out;
+ out[i].top=Math.max(0,out[i].anchor);
+ bottom=out[i].top+out[i].height+12;
+ for(let j=i+1;j<out.length;j++){out[j].top=Math.max(out[j].anchor,bottom);bottom=out[j].top+out[j].height+12;}
+ let limit=out[i].top-12;
+ for(let j=i-1;j>=0;j--){out[j].top=Math.min(out[j].top,limit-out[j].height);limit=out[j].top-12;}
  return out;
 }
 function viewport(host){
@@ -171,7 +178,7 @@ function update(){
    anchor=anchor||block?.querySelector(':scope > .body')||blocks;
    return {card,key:key(card),index,anchor:Math.max(0,anchor.getBoundingClientRect().top-origin),height:card.getBoundingClientRect().height};
   }).sort((a,b)=>a.anchor-b.anchor||a.index-b.index);
-  const placed=pack(items,active,vp.top+12-origin,textBottom);
+  const placed=pack(items,pinned);
   let end=textBottom;
   placed.forEach(item=>{
    const y=origin+item.top;
@@ -194,7 +201,7 @@ function activate(e){
  if(mark){
   const block=mark.closest('.blk');
   const match=[...host.querySelectorAll(CARD)].find(c=>c.classList.contains('rk-bc-thread')?c.dataset.id===mark.dataset.bc:(c.closest('.blk')===block&&normal(c.querySelector('.q')?.textContent)===normal(mark.textContent)));
-  if(match){active=key(match);schedule();}
+  if(match){active=key(match);pinned=active;schedule();}
  }
 }
 document.addEventListener('pointerdown',activate,true);
@@ -205,7 +212,7 @@ document.addEventListener('change',schedule);
 document.addEventListener('load',schedule,true);
 window.addEventListener('resize',schedule,{passive:true});
 window.addEventListener('storage',schedule);
-window.addEventListener('hashchange',()=>{active='';schedule();});
+window.addEventListener('hashchange',()=>{active='';pinned='';schedule();});
 new MutationObserver(schedule).observe(document.body,{childList:true,subtree:true,characterData:true});
 new MutationObserver(schedule).observe(document.body,{attributes:true,attributeFilter:['class','data-font','data-ui','data-theme','data-palette','data-rk-mode','data-rk-palette']});
 if(document.fonts?.ready)document.fonts.ready.then(schedule);
