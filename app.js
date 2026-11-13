@@ -2689,16 +2689,31 @@ function rkCharacterDesigner(host,p,data){
   n.style.setProperty('background-color',bg,'important');n.style.setProperty('color',ink,'important');
   n.style.setProperty('--ci',ink,'important');n.style.setProperty('--cp',bg,'important');
  }
+ function ccPaletteColors(){
+  const key=document.body.dataset.rkPalette||document.body.dataset.palette||'base',all=window.RK_BETA_BRIDGE?.PALETTES;
+  const colors=new Set(),seen=new WeakSet();
+  function visit(v){if(typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v)){colors.add(v.toLowerCase());return;}if(v&&typeof v==='object'&&!seen.has(v)){seen.add(v);Object.values(v).forEach(visit);}}
+  visit(all?.[key]);
+  if(!colors.size){const css=getComputedStyle(document.body);['--rk-dark','--rk-light','--rk-heading','--rk-primary','--rk-secondary','--rk-hover'].forEach(k=>visit(css.getPropertyValue(k).trim()));}
+  return [...colors];
+ }
+
  function ccColorSettings(it){
   const m=document.getElementById('specialModal'),ok=m?.querySelector('#spOk'),body=m?.querySelector('.dlgbox-body');
   if(!m||m.hidden||!ok||!body||body.querySelector('[data-cc-block-color]'))return;
   const current=model.items.find(x=>x.id===it.id);if(!current)return;
   const own=/^#[0-9a-f]{6}$/i.test(current.blockColor||'');
   const section=document.createElement('fieldset');section.dataset.ccBlockColor='1';
-  section.innerHTML='<legend>Цвет блока</legend><label style="display:flex;gap:12px;align-items:center">Цвет фона <input type="color" aria-label="Цвет фона блока"></label><label style="display:flex;gap:10px;align-items:center;margin-top:10px"><input type="checkbox"> Как у карточки — без собственной заливки</label><p class="muted" style="margin-top:8px">Текст и линии автоматически станут чёрными или белыми для контраста.</p>';
-  const color=section.querySelector('input[type=color]'),reset=section.querySelector('input[type=checkbox]');
+  section.innerHTML='<legend>Цвет блока</legend><label style="display:flex;gap:12px;align-items:center">Цвет фона <input type="hidden" data-cc-palette-value><span data-cc-palette role="group" aria-label="Цвета выбранной палитры"></span></label><label style="display:flex;gap:10px;align-items:center;margin-top:10px"><input type="checkbox"> Как у карточки — без собственной заливки</label>';
+  const color=section.querySelector('input[data-cc-palette-value]'),reset=section.querySelector('input[type=checkbox]');
   const inherited=getComputedStyle(root).getPropertyValue('--cp').trim();
   color.value=own?current.blockColor:(/^#[0-9a-f]{6}$/i.test(inherited)?inherited:'#e5e0cf');reset.checked=!own;
+
+  const swatches=section.querySelector('[data-cc-palette]');swatches.style.cssText='display:flex;flex-wrap:wrap;gap:10px;padding:4px;';
+  function syncSwatches(){swatches.querySelectorAll('button').forEach(b=>{const on=!reset.checked&&b.dataset.hex===color.value.toLowerCase();b.setAttribute('aria-pressed',String(on));b.style.setProperty('outline',on?'2px solid var(--rk-text,var(--text))':'none','important');b.style.outlineOffset='2px';});}
+  ccPaletteColors().forEach(hex=>{const b=document.createElement('button');b.type='button';b.dataset.hex=hex;b.title=hex;b.setAttribute('aria-label','Цвет '+hex);b.style.cssText='display:block;width:30px;height:30px;min-width:30px;padding:0;border:1px solid var(--line-strong);border-radius:50%;cursor:pointer;';b.style.setProperty('background',hex,'important');b.onclick=e=>{e.preventDefault();e.stopPropagation();color.value=hex;reset.checked=false;syncSwatches();};swatches.appendChild(b);});
+  reset.addEventListener('change',syncSwatches);syncSwatches();
+
   color.addEventListener('input',()=>{reset.checked=false;});body.appendChild(section);
   const original=ok.onclick;
   if(typeof original!=='function'){section.remove();return;}
