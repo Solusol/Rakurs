@@ -1,0 +1,40 @@
+name: Install checkbox font and visible block insertion
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/character-visible-insert.yml'
+      - 'scripts/patch_character_visible_insert.py'
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+concurrency:
+  group: install-character-visible-insert
+  cancel-in-progress: false
+jobs:
+  install:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply source-locked patch
+        run: python scripts/patch_character_visible_insert.py
+      - name: Check JavaScript
+        run: |
+          node --check app.js
+          node --check sw.js
+      - name: Commit targeted changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.js styles.css sw.js
+          git diff --cached --quiet && exit 0
+          git commit -m 'Use body font for checkboxes and insert blocks in current viewport'
+          git push origin HEAD:main
+      - name: Request Pages publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api --method POST "repos/$GITHUB_REPOSITORY/pages/builds"
