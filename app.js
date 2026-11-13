@@ -2188,7 +2188,7 @@ function wsCardIcon(kind){
 }
 function wsCard(p){
  const u=wsUser(p), data=u&&u.blockData||{};
- const canvas=u&&(u.blockType==='character'?data.characterCanvas:u.blockType==='location'?data.locationCanvas:null);const preview=canvas&&Array.isArray(canvas.items)?(canvas.items.find(it=>it&&it.type==='media'&&it.media&&it.media.kind==='image'&&wsTimelineMediaSafe(it.media))||{}).media:null;const src=canvas?(preview&&preview.src):data.image;
+ const canvas=u&&(u.blockType==='character'?data.characterCanvas:u.blockType==='location'?data.locationCanvas:null);const preview=canvas&&Array.isArray(canvas.items)?(canvas.items.filter(it=>it&&it.type==='media'&&it.media&&it.media.kind==='image'&&wsTimelineMediaSafe(it.media)).sort((a,b)=>(Number(a.y)||0)-(Number(b.y)||0)||(Number(a.x)||0)-(Number(b.x)||0))[0]||{}).media:null;const src=canvas?(preview&&preview.src):data.image;
  const image=src&&wsTimelineMediaSafe({kind:'image',src})?'<img class="ws-card-image" src="'+esc(src)+'" alt="" loading="lazy">':'';
  return '<a class="ws-card" data-ws-kind="'+esc(wsType(p))+'" draggable="'+(!tabReadOnly)+'" data-ws-reorder="'+p.id+'" href="#/'+p.id+'">'+image+'<span class="ws-type">'+esc(wsLabel(p))+'</span><span class="ws-card-title">'+esc(p.title)+'</span>'+wsCardIcon(wsType(p))+wsActButtons(p)+'</a>';
 }

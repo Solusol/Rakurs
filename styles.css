@@ -1012,3 +1012,51 @@ html body label:has(input[type=checkbox]) :where(span,.label-text),
 html body :is(#view,#view2Body) .rk-character-designer .cc-row:has(>input[type=checkbox]) .cc-input {
   font-family: var(--prose, serif) !important;
 }
+
+/* Палитра для технических элементов: чекбоксы, шкалы, полосы прокрутки */
+html body :is(#view,#view2Body) .rk-character-designer input[type=checkbox]{
+  -webkit-appearance:none!important;appearance:none!important;box-sizing:border-box;
+  width:18px;height:18px;flex:0 0 18px;margin:0;border-radius:3px;
+  border:1.5px solid color-mix(in srgb,var(--rk-text,var(--text)) 55%,transparent);
+  background:transparent no-repeat center/12px 12px;opacity:1!important;cursor:pointer;
+}
+html body :is(#view,#view2Body) .rk-character-designer input[type=checkbox]:disabled{cursor:default}
+html body :is(#view,#view2Body) .rk-character-designer input[type=checkbox]:checked{
+  border-color:var(--rk-primary,var(--green));background-color:var(--rk-primary,var(--green));
+  -webkit-mask:none;
+  background-image:linear-gradient(transparent,transparent);
+}
+html body :is(#view,#view2Body) .rk-character-designer input[type=checkbox]:checked::after{
+  content:"";display:block;width:5px;height:9px;margin:1px auto 0;
+  border:solid var(--rk-light,var(--rk-text,var(--text)));border-width:0 2px 2px 0;transform:rotate(45deg);
+}
+html body :is(#view,#view2Body) .rk-character-designer input[type=checkbox]:not(:disabled):hover{border-color:var(--rk-hover,var(--hover))}
+html body :is(#view,#view2Body) .rk-character-designer input[type=checkbox]:focus-visible{outline:2px solid var(--rk-secondary,var(--line));outline-offset:2px}
+
+html body :is(#view,#view2Body) .rk-character-designer input[type=range]{-webkit-appearance:none!important;appearance:none!important;cursor:pointer}
+html body :is(#view,#view2Body) .rk-character-designer input[type=range]::-webkit-slider-runnable-track{height:2px;background:transparent;border:0}
+html body :is(#view,#view2Body) .rk-character-designer input[type=range]::-moz-range-track{height:2px;background:transparent;border:0}
+html body :is(#view,#view2Body) .rk-character-designer input[type=range]::-moz-range-progress{background:transparent}
+html body :is(#view,#view2Body) .rk-character-designer input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;width:16px;height:16px;margin-top:-7px;border-radius:50%;
+  border:2px solid var(--rk-text,var(--text));background:var(--rk-bg,var(--bg));box-shadow:none;
+}
+html body :is(#view,#view2Body) .rk-character-designer input[type=range]::-moz-range-thumb{
+  box-sizing:border-box;width:16px;height:16px;border-radius:50%;
+  border:2px solid var(--rk-text,var(--text));background:var(--rk-bg,var(--bg));box-shadow:none;
+}
+html body :is(#view,#view2Body) .rk-character-designer input[type=range]:hover::-webkit-slider-thumb{border-color:var(--rk-hover,var(--hover))}
+html body :is(#view,#view2Body) .rk-character-designer input[type=range]:hover::-moz-range-thumb{border-color:var(--rk-hover,var(--hover))}
+
+@supports selector(::-webkit-scrollbar){
+  html body[data-rk-mode] *{scrollbar-width:auto!important;scrollbar-color:auto!important}
+  html body[data-rk-mode] ::-webkit-scrollbar{width:8px;height:8px;background:transparent}
+  html body[data-rk-mode] ::-webkit-scrollbar-track{background:transparent}
+  html body[data-rk-mode] ::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--rk-text,var(--text)) 35%,transparent);border-radius:8px;border:2px solid transparent;background-clip:padding-box}
+  html body[data-rk-mode] ::-webkit-scrollbar-thumb:hover{background-color:var(--rk-hover,var(--hover))}
+  html body[data-rk-mode] ::-webkit-scrollbar-button{display:none;width:0;height:0}
+  html body[data-rk-mode] ::-webkit-scrollbar-corner{background:transparent}
+}
+@supports not selector(::-webkit-scrollbar){
+  html body[data-rk-mode] *{scrollbar-color:color-mix(in srgb,var(--rk-text,var(--text)) 35%,transparent) transparent}
+}
