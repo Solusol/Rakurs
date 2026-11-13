@@ -110,12 +110,27 @@ html:root body :is(#view,#view2Body) .ws-card:is([data-ws-kind="character"],[dat
   flex: 0 0 auto;
 }
 
-/* Keep controls reachable for selected items at the canvas top edge. */
-html:root body :is(#view,#view2Body) .rk-character-designer[data-edit="1"] .cc-item.cc-selected:is([style*="top:0px"],[style*="top: 0px"],[style*="top:20px"],[style*="top: 20px"],[style*="top:0;"],[style*="top: 0;"]) > .cc-item-tools {
+/* Keep selected block controls below the item, independently of inline coordinates. */
+html:root body :is(#view,#view2Body) .rk-character-designer[data-edit="1"] .cc-item.cc-selected {
+  overflow: visible !important;
+  z-index: 600 !important;
+}
+html:root body :is(#view,#view2Body) .rk-character-designer[data-edit="1"] .cc-item.cc-selected > .cc-item-tools {
+  display: flex !important;
+  position: absolute !important;
   top: calc(100% + 6px) !important;
   bottom: auto !important;
+  left: 0 !important;
+  z-index: 2;
+  flex-wrap: wrap;
+  max-width: 100%;
+  pointer-events: auto;
 }
-html:root body :is(#view,#view2Body) .rk-character-designer[data-edit="1"] .cc-sizer:has(.cc-item.cc-selected:is([style*="top:0px"],[style*="top: 0px"],[style*="top:20px"],[style*="top: 20px"],[style*="top:0;"],[style*="top: 0;"])) {
+html:root body :is(#view,#view2Body) .rk-character-designer[data-edit="1"] .cc-sizer {
+  overflow: visible !important;
   box-sizing: content-box !important;
   padding-bottom: 80px !important;
+}
+html:root body :is(#view,#view2Body) .rk-character-designer[data-edit="1"] .cc-stage {
+  overflow: visible !important;
 }
