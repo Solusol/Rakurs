@@ -303,7 +303,7 @@ function paneNotes(host){
   let html=`<div class="pane-title">Заметки · ${esc(p.title)} <small>${open.length} в работе${done.length?` · ${done.length} решено`:''}</small></div>`;
   if(!all.length){ host.innerHTML=html+'<div class="pane-empty">Заметок на этой странице нет. Выдели фрагмент в тексте — появится кнопка «Заметка к выделенному».</div>'; return; }
   const list=showD?all:open;
-  html+=`<div class="notes-list pane">${list.map((n,i)=>`<div class="nl${n.done?' done':''}" data-i="${i}">${n.quote?`<div class="q">«${esc(n.quote)}»</div>`:''}<div class="t">${esc(n.text)}</div><div class="m">${n.kind?`<span class="kind k-${n.kind}">${kindLabel(n.kind)}</span>`:''}<span>${esc(n.label)}</span><span class="sp"></span><button class="link" data-a="go">К месту</button>${n.pageNote?'':`<button class="link" data-a="done">${n.done?'Вернуть':'Решено'}</button>`}</div></div>`).join('')}</div>
+  html+=`<div class="notes-list pane">${list.map((n,i)=>`<div class="nl${n.done?' done':''}" data-i="${i}">${n.quote?`<div class="q">«${esc(n.quote)}»</div>`:''}<div class="t">${esc(n.text)}</div><div class="m">${tagHTML(tagsOf(n.obj))}<span>${esc(n.label)}</span><span class="sp"></span><button class="link" data-a="go">К месту</button>${n.pageNote?'':`<button class="link" data-a="done">${n.done?'Вернуть':'Решено'}</button>`}</div></div>`).join('')}</div>
     ${done.length?`<button class="link-btn dim" id="paneDoneToggle">${showD?'Скрыть решённые':`Показать решённые (${done.length})`}</button>`:''}`;
   host.innerHTML=html;
   host.querySelector('.notes-list').onclick=e=>{ const b=e.target.closest('button[data-a]'); const row=e.target.closest('.nl'); if(!row) return; const n=list[+row.dataset.i];
@@ -345,7 +345,7 @@ function renderPaneLegacy(focusBid){
     const body=el.querySelector('.body'); const text=body.textContent;
     Object.values(D.anns).forEach(a=>{ if(a.b1!==b.id||a.b2!==b.id||!a.text||a.done) return; let r=null; if(text.slice(a.o1,a.o2)===a.q) r=[a.o1,a.o2]; else { const i=text.indexOf(a.q); if(i>=0) r=[i,i+a.q.length]; } if(r&&r[1]>r[0]) wrapRange(body, r[0], r[1], a.id); });
     const slot=el.querySelector('.noteslot'); const n=noteOf(b.id); if(n && !n.done) slot.appendChild(noteCard(n,'Заметка к абзацу'));
-    Object.values(D.anns).filter(a=>a.b1===b.id && a.text && !a.done).sort((a,b)=>a.o1-b.o1).forEach(a=>{ const c=noteCard({text:a.text,quote:a.q,kind:a.kind}, a.by?('Заметка беты · '+esc(a.by)):'Заметка к фрагменту'); if(a.by) c.classList.add('editor'); slot.appendChild(c); });
+    Object.values(D.anns).filter(a=>a.b1===b.id && a.text && !a.done).sort((a,b)=>a.o1-b.o1).forEach(a=>{ const c=noteCard({text:a.text,quote:a.q,kind:a.kind, tags:a.tags}, a.by?('Заметка беты · '+esc(a.by)):'Заметка к фрагменту'); if(a.by) c.classList.add('editor'); slot.appendChild(c); });
     wrap.appendChild(el); });
   host.innerHTML=`<div class="pane-title">${gtag(groupOf(p.section))} ${esc(secLabel(p.section))} · ${esc(p.title)}${showSub(p)?' · '+esc(p.sub):''}</div>${isArchive(p)?tocHTML(p,true):''}`; host.appendChild(wrap);
   blocks.forEach((b,i)=>{ wrap.children[i].id='p2-'+b.id; });
@@ -435,6 +435,13 @@ function findIns(id){ for(const k in D.ins){ const i = D.ins[k].findIndex(b=>b.i
 function blockText(h){ const d=document.createElement('div'); d.innerHTML=String(h).replace(/<br\s*\/?>/gi,'\n').replace(/<\/(p|div|tr|li|figcaption)>/gi,'\n').replace(/<li[^>]*>/gi,'• ').replace(/<\/(td|th)>/gi,' '); return d.textContent.replace(/\u00a0/g,' ').replace(/[ \t]+\n/g,'\n').trim(); }
 const NOTE_KINDS=[['logic','Логика'],['character','Характер'],['style','Стиль'],['fact','Проверить факт']];
 function kindLabel(k){ const x=NOTE_KINDS.find(y=>y[0]===k); return x?x[1]:''; }
+/* Пользовательские теги заметок и комментариев: общий словарь проекта (новые теги добавляет только автор). */
+function projTags(){ const ws=wsData(); return Array.isArray(ws.commentTags)?ws.commentTags:[]; }
+function addProjTag(name){ name=String(name||'').replace(/\s+/g,' ').trim().slice(0,40); if(!name) return; const l=projTags(); if(!l.includes(name)) wsData().commentTags=[...l,name]; save(); }
+function tagsOf(n){ if(!n||typeof n!=='object') return []; if(Array.isArray(n.tags)) return n.tags; const k=n.kind&&kindLabel(n.kind); return k?[k]:[]; }
+function tagHTML(list){ const v=projTags(); const t=(list||[]).filter(x=>v.includes(x)); return t.length?`<span class="rk-bc-tags rk-note-tags">${t.map(x=>`<span class="rk-tag">${esc(x)}</span>`).join('')}</span>`:''; }
+function migrateKinds(){ const used=new Set(); [...Object.values(D.notes||{}),...Object.values(D.anns||{})].forEach(n=>{ if(n&&typeof n==='object'&&n.kind&&kindLabel(n.kind)&&!Array.isArray(n.tags)){ n.tags=[kindLabel(n.kind)]; used.add(kindLabel(n.kind)); } }); if(used.size){ wsData().commentTags=[...new Set([...projTags(),...used])]; save(); } }
+function notePicker(selected){ return window.RK_TAG_PICKER?RK_TAG_PICKER({tags:projTags,selected:selected||[],canCreate:true,onCreate:async name=>addProjTag(name)}):null; }
 let showDone=false;
 function noteOf(id){ const n=D.notes[id]; return n && n.text && n.text.trim() ? n : null; }
 function annsOf(id){ return Object.values(D.anns||{}).filter(a=>a.b1===id && a.text && a.text.trim()).sort((a,b)=>(a.o1-b.o1)||(a.ts-b.ts)); }
@@ -643,7 +650,7 @@ function renderPageLegacy(p, focusId){
   const visibleIds=new Set(pageBlocks(p).filter(b=>!b.deleted).map(b=>b.id));
   const lostAnns=Object.values(D.anns).filter(a=>a.text && a.text.trim() && (!a.done||showDone) && ((a.lost && a.pid===p.id) || (!a.lost && PAGE_OF[a.b1]===p.id && !visibleIds.has(a.b1))));
   if(lostAnns.length){ const box=document.createElement('div'); box.className='lost-box'; box.innerHTML=`<div class="lost-t">Заметки без места в тексте (${lostAnns.length}) — абзац, к которому они были привязаны, удалён или переписан</div>`;
-    lostAnns.forEach(a=>{ const c=noteCard({text:a.text, quote:a.q, kind:a.kind, done:a.done}, a.by?('Заметка беты · '+esc(a.by)):'Заметка к фрагменту', ()=>{ a.done=!a.done; save(); rerender(); }); c.classList.add('lost'); if(a.by) c.classList.add('editor');
+    lostAnns.forEach(a=>{ const c=noteCard({text:a.text, quote:a.q, kind:a.kind, tags:a.tags, done:a.done}, a.by?('Заметка беты · '+esc(a.by)):'Заметка к фрагменту', ()=>{ a.done=!a.done; save(); rerender(); }); c.classList.add('lost'); if(a.by) c.classList.add('editor');
       const ab=document.createElement('button'); ab.className='anchor-btn'; ab.textContent='Привязать к выделению'; ab.onclick=e=>{ e.stopPropagation(); startAnchor(a.id); };
       const db=document.createElement('button'); db.className='anchor-btn'; db.textContent='Удалить'; db.onclick=e=>{ e.stopPropagation(); delete D.anns[a.id]; save(); rerender(); };
       c.querySelector('.meta').append(ab, db); box.appendChild(c); });
@@ -708,23 +715,25 @@ function placeCaretStart(el){ const r=document.createRange(); r.selectNodeConten
 let ORDER={}, VIEW={};
 function noteCard(n, label, onDone){
   const box=document.createElement('div'); box.className='note view'+(n.done?' done':'');
-  const kind=n.kind?`<span class="kind k-${n.kind}">${kindLabel(n.kind)}</span>`:'';
+  const kind=tagHTML(tagsOf(n));
   box.innerHTML=(n.quote?`<div class="q">«${esc(n.quote)}»</div>`:'')+`<p class="txt">${esc(n.text)}</p><div class="meta">${kind}<span>${label}</span>${onDone?`<button class="done-btn" title="${n.done?'Вернуть в работу':'Отметить решённой'}">${n.done?'↶ вернуть':'✓ решено'}</button>`:''}</div>`;
   box.addEventListener('mousedown',e=>e.stopPropagation());
   const db=box.querySelector('.done-btn'); if(db) db.onclick=e=>{ e.stopPropagation(); onDone(); };
   return box;
 }
-function noteEditor(prev, q, onSave, onCancel, onDelete, kind0){
-  const box=document.createElement('div'); box.className='note'; let kind=kind0||'';
+function noteEditor(prev, q, onSave, onCancel, onDelete, tags0){
+  const box=document.createElement('div'); box.className='note'; let kind=tags0||[];
   box.innerHTML=(q?`<div class="q">«${esc(q)}»</div>`:'')+`<textarea>${esc(prev||'')}</textarea>
     <div class="row"><button class="btn primary" data-a="save">Сохранить</button><button class="link" data-a="cancel">Отмена</button><span class="sp"></span>${onDelete?'<button class="link" data-a="del">Удалить</button>':''}</div>`;
   ['click','mousedown','mouseup','keydown'].forEach(ev=>box.addEventListener(ev,e=>e.stopPropagation()));
   box.querySelectorAll('.kind-btn').forEach(b=>b.onclick=()=>{ kind = kind===b.dataset.k ? '' : b.dataset.k; box.querySelectorAll('.kind-btn').forEach(x=>x.classList.toggle('on', x.dataset.k===kind)); });
   const ta=box.querySelector('textarea');
-  box.querySelector('[data-a=save]').onclick=()=>onSave(ta.value.trim(), kind);
+  const pk=notePicker(Array.isArray(tags0)?tags0:[]); if(pk){ box.querySelector('.row').before(pk); kind=()=>pk.value(); }
+  const tagsNow=()=>typeof kind==='function'?kind():kind;
+  box.querySelector('[data-a=save]').onclick=()=>onSave(ta.value.trim(), tagsNow());
   box.querySelector('[data-a=cancel]').onclick=onCancel;
   const del=box.querySelector('[data-a=del]'); if(del) del.onclick=onDelete;
-  ta.addEventListener('keydown',e=>{ if((e.metaKey||e.ctrlKey)&&e.key==='Enter') onSave(ta.value.trim(), kind); if(e.key==='Escape') onCancel(); });
+  ta.addEventListener('keydown',e=>{ if((e.metaKey||e.ctrlKey)&&e.key==='Enter') onSave(ta.value.trim(), tagsNow()); if(e.key==='Escape') onCancel(); });
   setTimeout(()=>{ ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); },0);
   return box;
 }
@@ -752,9 +761,9 @@ function renderNote(el, editing){
   if(editing && editing.kind==='para'){
     const q = editing.q!==undefined ? editing.q : ((n&&n.quote)||'');
     slot.appendChild(noteEditor(n?n.text:'', q,
-      (t,k)=>{ if(t) D.notes[id]={text:t,quote:q||'',ts:Date.now(),kind:k||'',done:n?!!n.done:false}; else delete D.notes[id]; save(); renderNote(el); },
+      (t,k)=>{ if(t) D.notes[id]={text:t,quote:q||'',ts:Date.now(),tags:Array.isArray(k)?k:[],done:n?!!n.done:false}; else delete D.notes[id]; save(); renderNote(el); },
       ()=>renderNote(el),
-      n?()=>{ delete D.notes[id]; save(); renderNote(el); }:null, n?n.kind:''));
+      n?()=>{ delete D.notes[id]; save(); renderNote(el); }:null, n?tagsOf(n):[]));
   } else if(n && (!n.done || showDone)){
     const c=noteCard(n, 'Заметка к абзацу '+num, ()=>{ n.done=!n.done; save(); renderNote(el); }); c.addEventListener('click',e=>{ e.stopPropagation(); renderNote(el,{kind:'para'}); }); slot.appendChild(c);
   }
@@ -762,12 +771,12 @@ function renderNote(el, editing){
   anns.forEach(a=>{
     if(editing && editing.kind==='ann' && editing.id===a.id){
       slot.appendChild(noteEditor(a.text, a.q,
-        (t,k)=>{ if(t){ a.text=t; a.kind=k||''; a.ts=a.ts||Date.now(); } else delete D.anns[a.id]; save(); rerender(); },
+        (t,k)=>{ if(t){ a.text=t; a.tags=Array.isArray(k)?k:[]; delete a.kind; a.ts=a.ts||Date.now(); } else delete D.anns[a.id]; save(); rerender(); },
         ()=>{ if(!a.text) { delete D.anns[a.id]; rerender(); } else renderNote(el); },
-        a.text?()=>{ delete D.anns[a.id]; save(); rerender(); }:null, a.kind));
+        a.text?()=>{ delete D.anns[a.id]; save(); rerender(); }:null, tagsOf(a)));
     } else if(a.text && a.text.trim() && (!a.done || showDone)){
       const lost=annLost(a);
-      const c=noteCard({text:a.text, quote:a.q, kind:a.kind, done:a.done}, (a.by?('Заметка беты · '+esc(a.by)):'Заметка к фрагменту')+(lost?' · <b class="lost">фрагмент изменён — нужна перепривязка</b>':''), ()=>{ a.done=!a.done; save(); rerender(); }); c.dataset.ann=a.id; if(a.by) c.classList.add('editor'); if(lost){ c.classList.add('lost'); const ab=document.createElement('button'); ab.className='anchor-btn'; ab.textContent='Привязать к выделению'; ab.onclick=e=>{ e.stopPropagation(); startAnchor(a.id); }; c.querySelector('.meta').appendChild(ab); }
+      const c=noteCard({text:a.text, quote:a.q, kind:a.kind, tags:a.tags, done:a.done}, (a.by?('Заметка беты · '+esc(a.by)):'Заметка к фрагменту')+(lost?' · <b class="lost">фрагмент изменён — нужна перепривязка</b>':''), ()=>{ a.done=!a.done; save(); rerender(); }); c.dataset.ann=a.id; if(a.by) c.classList.add('editor'); if(lost){ c.classList.add('lost'); const ab=document.createElement('button'); ab.className='anchor-btn'; ab.textContent='Привязать к выделению'; ab.onclick=e=>{ e.stopPropagation(); startAnchor(a.id); }; c.querySelector('.meta').appendChild(ab); }
       c.addEventListener('click',e=>{ e.stopPropagation(); renderNote(el,{kind:'ann', id:a.id}); });
       c.addEventListener('mouseenter',()=>$$(`mark.ann[data-ann="${a.id}"]`).forEach(m=>m.classList.add('hot')));
       c.addEventListener('mouseleave',()=>$$(`mark.ann[data-ann="${a.id}"]`).forEach(m=>m.classList.remove('hot')));
@@ -786,33 +795,51 @@ function clearPageNotes(p){
   toast('Все заметки страницы убраны', {label:'Отменить', fn:()=>{ Object.assign(D.notes, backup.notes); Object.assign(D.anns, backup.anns); if(backup.pageNote) D.pageNotes[p.id]=backup.pageNote; save(); if(curPage===p) renderPage(p); }});
 }
 /* ---------- all notes of the project ---------- */
-let notesFilter={kind:'', done:false};
+let notesFilter={tag:'', done:false, manage:false}; let hubRk=[];
 function allNotes(){
   const out=[];
   PAGES.forEach(p=>{
     const blocks=pageBlocks(p).filter(b=>!b.deleted); const pos={}; blocks.forEach((b,i)=>pos[b.id]=i);
     if(D.pageNotes[p.id] && D.pageNotes[p.id].trim()) out.push({p, pos:-1, text:D.pageNotes[p.id], quote:'', label:'Заметка к странице', kind:'', done:false, pageNote:true});
     blocks.forEach(b=>{ const n=noteOf(b.id); if(n) out.push({p, pos:pos[b.id], bid:b.id, text:n.text, quote:n.quote||'', label:'К абзацу', kind:n.kind||'', done:!!n.done, obj:n}); });
-    Object.values(D.anns).forEach(a=>{ if(!a.text || !a.text.trim()) return; if(a.lost || (PAGE_OF[a.b1]===p.id && pos[a.b1]===undefined)){ if((a.lost?a.pid:PAGE_OF[a.b1])!==p.id) return; out.push({p, pos:-0.5, ann:a.id, text:a.text, quote:a.q, label:'Без места — нужна перепривязка', kind:a.kind||'', done:!!a.done, obj:a, by:a.by}); return; } if(PAGE_OF[a.b1]!==p.id) return; out.push({p, pos:(pos[a.b1]??0)+(a.o1||0)/1e6, bid:a.b1, ann:a.id, text:a.text, quote:a.q, label:(a.by?('Бета · '+a.by):'К фрагменту')+(annLost(a)?' · фрагмент изменён':''), kind:a.kind||'', done:!!a.done, obj:a, by:a.by}); });
+    Object.values(D.anns).forEach(a=>{ if(!a.text || !a.text.trim()) return; if(a.lost || (PAGE_OF[a.b1]===p.id && pos[a.b1]===undefined)){ if((a.lost?a.pid:PAGE_OF[a.b1])!==p.id) return; out.push({p, pos:-0.5, ann:a.id, text:a.text, quote:a.q, label:'Без места — нужна перепривязка', kind:a.kind, tags:a.tags||'', done:!!a.done, obj:a, by:a.by}); return; } if(PAGE_OF[a.b1]!==p.id) return; out.push({p, pos:(pos[a.b1]??0)+(a.o1||0)/1e6, bid:a.b1, ann:a.id, text:a.text, quote:a.q, label:(a.by?('Бета · '+a.by):'К фрагменту')+(annLost(a)?' · фрагмент изменён':''), kind:a.kind, tags:a.tags||'', done:!!a.done, obj:a, by:a.by}); });
   });
   return out.sort((x,y)=>PAGES.indexOf(x.p)-PAGES.indexOf(y.p) || x.pos-y.pos);
 }
-function openNotes(){ $('#notesModal').hidden=false; renderNotesList(); }
+function openNotes(){ migrateKinds(); $('#notesModal').hidden=false; renderNotesList(); loadHubRk(); }
+function loadHubRk(){ if(!(window.RK_BETA&&RK_BETA.hubComments)) return Promise.resolve(); return RK_BETA.hubComments().then(list=>{ hubRk=list||[]; if(!$('#notesModal').hidden) renderNotesList(); }).catch(()=>{}); }
+/* комментарии для беты (облако) в общем списке заметок */
+function rkHubNotes(){ const out=[]; hubRk.forEach(c=>{ const p=PAGE[c.page_id]; if(!p) return; const blocks=pageBlocks(p).filter(b=>!b.deleted); const i=c.block_id?blocks.findIndex(b=>b.id===c.block_id):-1; out.push({p, pos:c.block_id?(i<0?-0.4:i+(c.o1||0)/1e6):-0.9, bid:i>=0?c.block_id:'', text:c.body, quote:c.quote||'', label:(c.role==='editor'?'Бета'+(c.author_name?' · '+c.author_name:''):'Автор, для беты')+(c._private?' · не отправлено':''), tags:c.tags||[], done:!!c.done, rk:c}); }); return out; }
 function renderNotesList(){
-  const all=allNotes(); const open=all.filter(n=>!n.done).length, done=all.length-open;
-  const list=all.filter(n=>(notesFilter.done?n.done:!n.done) && (!notesFilter.kind || n.kind===notesFilter.kind));
+  const all=allNotes().concat(rkHubNotes()).sort((x,y)=>PAGES.indexOf(x.p)-PAGES.indexOf(y.p) || x.pos-y.pos); const open=all.filter(n=>!n.done).length, done=all.length-open;
+  const vocab=projTags(); if(notesFilter.tag&&!vocab.includes(notesFilter.tag)) notesFilter.tag=''; if(!vocab.length) notesFilter.manage=false;
+  const tagsFor=n=>n.rk?(n.tags||[]):tagsOf(n.obj);
+  const list=all.filter(n=>(notesFilter.done?n.done:!n.done) && (!notesFilter.tag || tagsFor(n).includes(notesFilter.tag)));
   $('#notesCounts').textContent=`${open} в работе · ${done} решено`;
-  const f=$('#notesFilters'); f.innerHTML=`<button class="chip${!notesFilter.kind?' on':''}" data-k="">Все</button>`+NOTE_KINDS.map(([k,l])=>`<button class="chip k-${k}${notesFilter.kind===k?' on':''}" data-k="${k}">${l}</button>`).join('')+`<span class="sp"></span><button class="chip${notesFilter.done?' on':''}" data-done="1">${notesFilter.done?'Показаны решённые':'Решённые'}</button>`;
-  f.onclick=e=>{ const b=e.target.closest('button'); if(!b) return; if(b.dataset.done){ notesFilter.done=!notesFilter.done; } else notesFilter.kind=b.dataset.k; renderNotesList(); };
+  const f=$('#notesFilters'); const ro=document.body.classList.contains('tab-readonly');
+  f.innerHTML=`<button class="chip${!notesFilter.tag?' on':''}" data-k="">Все</button>`+vocab.map(t=>`<button class="chip${notesFilter.tag===t?' on':''}" data-k="${esc(t)}"${notesFilter.manage?` title="Удалить тег «${esc(t)}»"`:''}>${esc(t)}${notesFilter.manage?' ✕':''}</button>`).join('')+(ro?'':`<button class="chip add" data-add="1">+ тег</button>`)+`<span class="sp"></span>`+(vocab.length&&!ro?`<button class="chip${notesFilter.manage?' on':''}" data-manage="1">${notesFilter.manage?'Готово':'Править теги'}</button>`:'')+`<button class="chip${notesFilter.done?' on':''}" data-done="1">${notesFilter.done?'Показаны решённые':'Решённые'}</button>`;
+  f.onclick=e=>{ const b=e.target.closest('button'); if(!b) return;
+    if(b.dataset.done){ notesFilter.done=!notesFilter.done; renderNotesList(); return; }
+    if(b.dataset.manage){ notesFilter.manage=!notesFilter.manage; renderNotesList(); return; }
+    if(b.dataset.add){ const inp=document.createElement('input'); inp.className='rk-tag-input'; inp.placeholder='Новый тег'; inp.maxLength=40; b.replaceWith(inp); inp.focus(); let fin=false; const done=ok=>{ if(fin) return; fin=true; if(ok&&inp.value.trim()) addProjTag(inp.value); renderNotesList(); }; inp.onkeydown=ev=>{ ev.stopPropagation(); if(ev.key==='Enter'){ ev.preventDefault(); done(true); } else if(ev.key==='Escape'){ ev.preventDefault(); done(false); } }; inp.onblur=()=>done(true); return; }
+    const t=b.dataset.k; if(t===undefined) return;
+    if(notesFilter.manage&&t){ if(!confirm(`Удалить тег «${t}»? С заметок и комментариев он пропадет из списка тегов.`)) return; wsData().commentTags=projTags().filter(x=>x!==t); save(); if(curPage) rerender(); if(window.RK_BETA&&RK_BETA.refresh) RK_BETA.refresh(); renderNotesList(); return; }
+    notesFilter.tag=t; renderNotesList(); };
   const el=$('#notesList');
   if(!list.length){ el.innerHTML=`<div class="muted">${notesFilter.done?'Решённых заметок нет.':'Открытых заметок нет.'}</div>`; return; }
   let html='', lastP=null;
   list.forEach((n,i)=>{ if(n.p!==lastP){ lastP=n.p; html+=`<h4>${gtag(groupOf(n.p.section))} ${esc(n.p.title)}</h4>`; }
-    html+=`<div class="nl${n.done?' done':''}" data-i="${i}">${n.quote?`<div class="q">«${esc(n.quote)}»</div>`:''}<div class="t">${esc(n.text)}</div><div class="m">${n.kind?`<span class="kind k-${n.kind}">${kindLabel(n.kind)}</span>`:''}<span>${esc(n.label)}</span><span class="sp"></span><button class="link" data-a="go">К месту</button>${n.pageNote?'':`<button class="link" data-a="done">${n.done?'Вернуть':'Решено'}</button>`}</div></div>`; });
+    html+=`<div class="nl${n.done?' done':''}" data-i="${i}">${n.quote?`<div class="q">«${esc(n.quote)}»</div>`:''}<div class="t">${esc(n.text)}</div><div class="m">${tagHTML(tagsFor(n))}<span>${esc(n.label)}</span><span class="sp"></span>${n.pageNote||ro?'':`<button class="link" data-a="tags">Теги</button>`}<button class="link" data-a="go">К месту</button>${n.pageNote?'':`<button class="link" data-a="done">${n.done?'Вернуть':'Решено'}</button>`}</div></div>`; });
   el.innerHTML=html;
-  el.onclick=e=>{ const b=e.target.closest('button[data-a]'); const row=e.target.closest('.nl'); if(!row) return; const n=list[+row.dataset.i];
-    if(b && b.dataset.a==='done'){ n.obj.done=!n.obj.done; save(); renderNotesList(); if(curPage===n.p) rerender(); return; }
-    $('#notesModal').hidden=true; nav('#/'+n.p.id+(n.bid?'@'+n.bid:'')); if(n.ann){ setTimeout(()=>{ if(n.done) { showDone=true; rerender(); } const m=document.querySelector(`mark.ann[data-ann="${n.ann}"]`); if(m) m.classList.add('hot'); setTimeout(()=>{ if(m) m.classList.remove('hot'); }, 2500); }, 350); } };
+  el.onclick=e=>{ if(e.target.closest('.rk-tag-pick,.nl-tag-edit')) return; const b=e.target.closest('button[data-a]'); const row=e.target.closest('.nl'); if(!row) return; const n=list[+row.dataset.i];
+    if(b && b.dataset.a==='tags'){ if(row.querySelector('.nl-tag-edit')) return; const pk=notePicker(tagsFor(n)); if(!pk) return; const box=document.createElement('div'); box.className='nl-tag-edit'; box.appendChild(pk); const rb=document.createElement('div'); rb.className='row-btns'; rb.innerHTML='<button class="btn primary" type="button" data-s>Сохранить</button><button class="btn" type="button" data-c>Отмена</button>'; box.appendChild(rb); row.appendChild(box);
+      rb.querySelector('[data-c]').onclick=ev=>{ ev.stopPropagation(); box.remove(); };
+      rb.querySelector('[data-s]').onclick=async ev=>{ ev.stopPropagation(); const val=pk.value(); if(n.rk){ try{ await RK_BETA.setTags(n.rk,val); await loadHubRk(); }catch(err){ toast((err&&err.message)||String(err)); } return; } n.obj.tags=val; delete n.obj.kind; save(); if(curPage===n.p) rerender(); renderNotesList(); };
+      return; }
+    if(b && b.dataset.a==='done'){ if(n.rk){ RK_BETA.setDone(n.rk).then(loadHubRk).catch(err=>toast((err&&err.message)||String(err))); return; } n.obj.done=!n.obj.done; save(); renderNotesList(); if(curPage===n.p) rerender(); return; }
+    $('#notesModal').hidden=true; nav('#/'+n.p.id+(n.bid?'@'+n.bid:''));
+    if(n.rk){ setTimeout(()=>{ const sel='[data-bc="'+n.rk.id+'"]'; const m=document.querySelector('mark.rk-bc-mark'+sel), card=document.querySelector('.rk-bc-thread[data-id="'+n.rk.id+'"]'); [m,card].forEach(x=>x&&x.classList.add('hot')); if(card&&!m) card.scrollIntoView({block:'nearest'}); setTimeout(()=>[m,card].forEach(x=>x&&x.classList.remove('hot')),2500); },900); return; }
+    if(n.ann){ setTimeout(()=>{ if(n.done) { showDone=true; rerender(); } const m=document.querySelector(`mark.ann[data-ann="${n.ann}"]`); if(m) m.classList.add('hot'); setTimeout(()=>{ if(m) m.classList.remove('hot'); }, 2500); }, 350); } };
   $('#notesClearPage').hidden=!curPage; if(curPage) $('#notesClearPage').textContent=`Убрать все заметки со страницы «${curPage.title}»`;
 }
 function editNote(el, quote){ renderNote(el, {kind:'para', q:quote}); }
