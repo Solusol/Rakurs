@@ -109,3 +109,13 @@ html:root body :is(#view,#view2Body) .ws-card:is([data-ws-kind="character"],[dat
   border-radius: 0 !important;
   flex: 0 0 auto;
 }
+
+/* Keep controls reachable for selected items at the canvas top edge. */
+html:root body :is(#view,#view2Body) .rk-character-designer[data-edit="1"] .cc-item.cc-selected:is([style*="top:0px"],[style*="top: 0px"],[style*="top:20px"],[style*="top: 20px"],[style*="top:0;"],[style*="top: 0;"]) > .cc-item-tools {
+  top: calc(100% + 6px) !important;
+  bottom: auto !important;
+}
+html:root body :is(#view,#view2Body) .rk-character-designer[data-edit="1"] .cc-sizer:has(.cc-item.cc-selected:is([style*="top:0px"],[style*="top: 0px"],[style*="top:20px"],[style*="top: 20px"],[style*="top:0;"],[style*="top: 0;"])) {
+  box-sizing: content-box !important;
+  padding-bottom: 80px !important;
+}
