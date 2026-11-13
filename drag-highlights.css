@@ -139,3 +139,19 @@ html:root body :is(#view,#view2Body) .rk-character-designer[data-edit="1"] .cc-s
 html:root body :is(#view,#view2Body) .rk-character-designer .cc-item:has(.cc-media) .cc-content button:not(.cc-item-tools button) {
   display: none !important;
 }
+
+/* Keep the constructor's main controls available while scrolling. */
+html:root body #view .rk-character-designer > .cc-tools {
+  position: sticky !important;
+  top: var(--barh, 0px) !important;
+  z-index: 10001 !important;
+  background: var(--cp, var(--rk-bg, var(--bg))) !important;
+  padding-block: 4px;
+}
+html:root body #view2Body .rk-character-designer > .cc-tools {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10001 !important;
+  background: var(--cp, var(--rk-bg, var(--bg))) !important;
+  padding-block: 4px;
+}
