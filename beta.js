@@ -35,7 +35,7 @@ const CSS=`
 .rk-comment-settings button{box-sizing:border-box!important;transform:none!important;border-width:1px!important}
 .rk-comment-settings button:focus-visible,.rk-comment-settings input:focus-visible{outline:2px solid var(--text)!important;outline-offset:3px}
 @media(min-width:1050px){
-html body:not(.mode-edit) .rk-bc-sideview{position:relative!important;max-width:1600px!important;overflow:visible!important;--rk-comment-width:300px;--rk-comment-gap:24px}
+html body:not(.mode-edit) .rk-bc-sideview{position:relative!important;max-width:1600px!important;overflow:visible!important;--rk-comment-width:340px;--rk-comment-gap:24px}
 html body:not(.mode-edit) .rk-bc-sideview .blocks{position:static!important;width:calc(100% - var(--rk-comment-width) - var(--rk-comment-gap))!important;max-width:none!important;box-sizing:border-box!important;margin-inline:0!important}
 html body:not(.mode-edit) .rk-bc-sideview .blocks>.blk{display:block!important;position:static!important;min-height:0!important;grid-template-columns:none!important}
 html body:not(.mode-edit) .rk-bc-sideview .blocks>.blk>.body{min-width:0;grid-column:auto!important;grid-row:auto!important}
@@ -70,7 +70,7 @@ html body:not(.mode-edit) .rk-bc-sideview::after{content:'';display:block;height
 .rk-bc-actions button{font:inherit;font-size:13px;letter-spacing:.06em;background:none;border:0;padding:0;color:var(--rk-text,var(--text));cursor:pointer;text-decoration:underline;text-underline-offset:3px;opacity:.85}
 .rk-bc-actions button:hover{opacity:1;color:var(--bc)}
 .rk-bc-compose{display:grid;gap:8px;margin-top:8px}
-.rk-bc-compose textarea{width:100%;box-sizing:border-box;min-height:72px;font:inherit;font-family:var(--prose);font-size:1em;line-height:1.5;padding:8px 10px;border:1px solid var(--rk-line,var(--line));border-radius:4px;background:var(--rk-bg,var(--bg));color:var(--rk-text,var(--text));resize:vertical}
+.rk-bc-compose textarea{width:100%;box-sizing:border-box;min-height:120px;max-height:60vh;overflow-y:hidden;font:inherit;font-family:var(--prose);font-size:1em;line-height:1.5;padding:8px 10px;border:1px solid var(--rk-line,var(--line));border-radius:4px;background:var(--rk-bg,var(--bg));color:var(--rk-text,var(--text));resize:vertical}
 .rk-bc-compose .row-btns{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
 .rk-bc-compose select{font:inherit;font-size:14px;padding:5px 8px;border:1px solid var(--rk-line,var(--line));border-radius:4px;background:var(--rk-bg,var(--bg));color:var(--rk-text,var(--text))}
 mark.rk-bc-mark{background:color-mix(in srgb,var(--bc) 30%,transparent);color:inherit;border-bottom:2px solid var(--bc);padding:1px 0;cursor:pointer}
@@ -149,28 +149,78 @@ function selectionIn(container){
 /* Карточка ветки. ctx: {role, uid, colors, canResolve, onReply(root,text), onDone(root), onDelete(c), composeShares} */
 function threadCard(t,ctx){
   const c=t.root; const box=document.createElement('div'); box.className='rk-bc-thread'+(c.done?' done':''); box.dataset.id=c.id; box.style.setProperty('--bc',ctx.colors[c.role]||ctx.colors.editor); box.contentEditable='false';
-  const msg=(m,root)=>`<div class="rk-bc-msg${root?' root':''}" style="--bc:${esc(ctx.colors[m.role]||ctx.colors.editor)}"><div class="rk-bc-meta"><span class="rk-bc-who">${m.role==='author'?'Автор':'Бета'}${m.role==='editor'&&m.author_name?' · '+esc(m.author_name):''}</span><span class="rk-bc-when">${esc(when(m.created_at))}</span>${root&&m.done?'<span class="rk-bc-when">· решено</span>':''}</div>${root&&m.quote?`<div class="rk-bc-q" title="К фрагменту">«${esc(m.quote.length>220?m.quote.slice(0,220)+'…':m.quote)}»</div>`:''}<div class="rk-bc-text">${esc(m.body)}</div>${!root&&m.author_id===ctx.uid?`<div class="rk-bc-actions"><button type="button" data-del="${m.id}">Удалить</button></div>`:''}</div>`;
-  box.innerHTML=msg(c,true)+(t.replies.length?`<div class="rk-bc-replies">${t.replies.map(r=>msg(r,false)).join('')}</div>`:'')+`<div class="rk-bc-actions rk-bc-root-actions"><button type="button" data-reply>Ответить</button>${ctx.canResolve?`<button type="button" data-done>${c.done?'Вернуть в работу':'Решено'}</button>`:''}${c.author_id===ctx.uid?`<button type="button" data-del="${c.id}">Удалить</button>`:''}</div>`;
+  const msg=(m,root)=>`<div class="rk-bc-msg${root?' root':''}" style="--bc:${esc(ctx.colors[m.role]||ctx.colors.editor)}"><div class="rk-bc-meta"><span class="rk-bc-who">${m.role==='author'?'Автор':'Бета'}${m.role==='editor'&&m.author_name?' · '+esc(m.author_name):''}</span><span class="rk-bc-when">${esc(when(m.created_at))}</span>${root&&m.done?'<span class="rk-bc-when">· решено</span>':''}</div>${root&&m.quote?`<div class="rk-bc-q" title="К фрагменту">«${esc(m.quote.length>220?m.quote.slice(0,220)+'…':m.quote)}»</div>`:''}<div class="rk-bc-text">${esc(m.body)}</div>${!root&&m.author_id===ctx.uid?`<div class="rk-bc-actions">${ctx.onEdit?`<button type="button" data-edit="${m.id}">Изменить</button>`:''}<button type="button" data-del="${m.id}">Удалить</button></div>`:''}</div>`;
+  box.innerHTML=msg(c,true)+(t.replies.length?`<div class="rk-bc-replies">${t.replies.map(r=>msg(r,false)).join('')}</div>`:'')+`<div class="rk-bc-actions rk-bc-root-actions"><button type="button" data-reply>Ответить</button>${ctx.canResolve?`<button type="button" data-done>${c.done?'Вернуть в работу':'Решено'}</button>`:''}${c.author_id===ctx.uid&&ctx.onEdit?`<button type="button" data-edit="${c.id}">Изменить</button>`:''}${c.author_id===ctx.uid?`<button type="button" data-del="${c.id}">Удалить</button>`:''}</div>`;
   attachPublishButtons(box,t,ctx);
   box.addEventListener('mousedown',e=>e.stopPropagation());
   box.querySelectorAll('[data-del]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); if(!confirm('Удалить комментарий?')) return; ctx.onDelete(b.dataset.del); });
+  const all=[c,...t.replies];
+  box.querySelectorAll('[data-edit]').forEach(b=>b.onclick=e=>{ e.stopPropagation(); const m=all.find(x=>String(x.id)===b.dataset.edit); if(!m||box.querySelector('.rk-bc-compose')) return;
+    const node=[...box.querySelectorAll('.rk-bc-msg')][all.indexOf(m)]; const txt=node&&node.querySelector('.rk-bc-text'); if(!txt) return;
+    const hide=[txt]; if(m===c) hide.push(box.querySelector('.rk-bc-root-actions')); else { const a=node.querySelector('.rk-bc-actions'); if(a) hide.push(a); }
+    hide.forEach(x=>x&&(x.hidden=true));
+    const f=composer({edit:true,value:m.body,ok:'Сохранить',placeholder:'Текст комментария…',onOk:async text=>{ if(text===m.body){ restore(); return; } await ctx.onEdit(m,text); },onCancel:()=>restore()});
+    function restore(){ f.remove(); hide.forEach(x=>x&&(x.hidden=false)); }
+    txt.after(f); focusComposer(f); });
   const dn=box.querySelector('[data-done]'); if(dn) dn.onclick=e=>{ e.stopPropagation(); ctx.onDone(c); };
   const q=box.querySelector('.rk-bc-q'); if(q) q.onclick=e=>{ e.stopPropagation(); const m=document.querySelector('mark.rk-bc-mark[data-bc="'+CSS_escape(c.id)+'"]'); if(m){ m.scrollIntoView({block:'center',behavior:'smooth'}); m.classList.add('hot'); setTimeout(()=>m.classList.remove('hot'),1600); } };
-  box.querySelector('[data-reply]').onclick=e=>{ e.stopPropagation(); if(box.querySelector('.rk-bc-compose')) return; const f=composer({placeholder:'Ответ…',ok:ctx.role==='author'?'Сохранить':'Отправить',onOk:async text=>{ await ctx.onReply(c,text); },onCancel:()=>f.remove()}); box.appendChild(f); f.querySelector('textarea').focus(); };
+  box.querySelector('[data-reply]').onclick=e=>{ e.stopPropagation(); if(box.querySelector('.rk-bc-compose')) return; const f=composer({placeholder:'Ответ…',ok:ctx.role==='author'?'Сохранить':'Отправить',onOk:async text=>{ await ctx.onReply(c,text); },onCancel:()=>f.remove()}); box.appendChild(f); focusComposer(f); };
   box.addEventListener('mouseenter',()=>document.querySelectorAll('mark.rk-bc-mark[data-bc="'+CSS_escape(c.id)+'"]').forEach(m=>m.classList.add('hot')));
   box.addEventListener('mouseleave',()=>document.querySelectorAll('mark.rk-bc-mark[data-bc="'+CSS_escape(c.id)+'"]').forEach(m=>m.classList.remove('hot')));
   return box;
 }
-/* Форма ввода. opts: {placeholder, ok, onOk(text, shareId), onCancel, shares:[{id,label}], quote} */
+/* Форма ввода. opts: {placeholder, ok, onOk(text, shareId), onCancel, shares:[{id,label}], quote, value} */
+function growTextarea(ta){ ta.style.height='auto'; const max=Math.max(160,Math.round(innerHeight*0.6)); ta.style.height=Math.min(ta.scrollHeight+2,max)+'px'; ta.style.overflowY=ta.scrollHeight+2>max?'auto':'hidden'; }
+/* Фокус без прыжка страницы: сначала карточка встает на место, потом показываем ее, только если она вне экрана. */
+function focusComposer(f){
+  const ta=f&&f.querySelector('textarea'); if(!ta) return;
+  try{ ta.focus({preventScroll:true}); }catch(e){ ta.focus(); }
+  try{ const n=ta.value.length; ta.setSelectionRange(n,n); }catch(e){}
+  /* ждем, пока раскладка карточек перестанет двигать форму (до ~0,5 с), и только потом решаем, нужна ли прокрутка */
+  let last=null, stable=0, frames=0;
+  const tick=()=>{ if(!f.isConnected) return; const r=f.getBoundingClientRect(); const same=last&&Math.abs(r.top-last)<0.5; last=r.top; stable=same?stable+1:0; frames++;
+    if(stable<3&&frames<30){ requestAnimationFrame(tick); return; }
+    const bar=document.querySelector(document.body.classList.contains('rk-beta-mode')?'.rk-beta-bar':'.bar'); const top=(bar?Math.max(0,bar.getBoundingClientRect().bottom):0)+12;
+    if(r.top<top) window.scrollBy({top:r.top-top,behavior:'smooth'}); else if(r.bottom>innerHeight-12) window.scrollBy({top:Math.min(r.bottom-innerHeight+12,r.top-top),behavior:'smooth'});
+  };
+  requestAnimationFrame(tick);
+}
 function composer(opts){
-  const f=document.createElement('div'); f.className='rk-bc-compose'; f.contentEditable='false';
-  f.innerHTML=(opts.quote?`<div class="rk-bc-q">«${esc(opts.quote.length>220?opts.quote.slice(0,220)+'…':opts.quote)}»</div>`:'')+`<textarea placeholder="${esc(opts.placeholder||'Комментарий…')}"></textarea><div class="row-btns">${opts.shares&&opts.shares.length>1?`<select>${opts.shares.map(s=>`<option value="${esc(s.id)}">${esc(s.label)}</option>`).join('')}</select>`:''}<button type="button" class="btn primary" data-ok>${esc(opts.ok||'Отправить')}</button><button type="button" class="btn" data-cancel>Отмена</button><span class="muted" data-msg></span></div>`;
-  f.addEventListener('mousedown',e=>e.stopPropagation()); f.addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Escape'){ opts.onCancel&&opts.onCancel(); } if((e.ctrlKey||e.metaKey)&&e.key==='Enter') f.querySelector('[data-ok]').click(); });
-  f.addEventListener('input',e=>e.stopPropagation()); f.addEventListener('beforeinput',e=>e.stopPropagation());
+  const f=document.createElement('div'); f.className='rk-bc-compose'; f.contentEditable='false'; if(opts.edit) f.dataset.edit='1';
+  f.innerHTML=(opts.quote?`<div class="rk-bc-q">«${esc(opts.quote.length>220?opts.quote.slice(0,220)+'…':opts.quote)}»</div>`:'')+`<textarea rows="4" placeholder="${esc(opts.placeholder||'Комментарий…')}"></textarea><div class="row-btns">${opts.shares&&opts.shares.length>1?`<select>${opts.shares.map(s=>`<option value="${esc(s.id)}">${esc(s.label)}</option>`).join('')}</select>`:''}<button type="button" class="btn primary" data-ok>${esc(opts.ok||'Отправить')}</button><button type="button" class="btn" data-cancel>Отмена</button><span class="muted" data-msg></span></div>`;
+  const ta=f.querySelector('textarea'); if(opts.value) ta.value=opts.value;
+  f.addEventListener('mousedown',e=>e.stopPropagation()); f.addEventListener('keydown',e=>{ e.stopPropagation(); if(e.key==='Escape'){ opts.onCancel&&opts.onCancel(); } if((e.ctrlKey||e.metaKey)&&e.key==='Enter') send(); });
+  f.addEventListener('input',e=>{ e.stopPropagation(); if(e.target===ta) growTextarea(ta); }); f.addEventListener('beforeinput',e=>e.stopPropagation());
+  requestAnimationFrame(()=>growTextarea(ta));
   f.querySelector('[data-cancel]').onclick=e=>{ e.stopPropagation(); opts.onCancel&&opts.onCancel(); };
-  f.querySelector('[data-ok]').onclick=async e=>{ e.stopPropagation(); const ta=f.querySelector('textarea'); const text=ta.value.trim(); if(!text){ ta.focus(); return; } const btns=f.querySelectorAll('button'); btns.forEach(b=>b.disabled=true); const sel=f.querySelector('select'); try{ await opts.onOk(text, sel?sel.value:(opts.shares&&opts.shares[0]?opts.shares[0].id:null)); }catch(err){ f.querySelector('[data-msg]').textContent=humanErr(err); btns.forEach(b=>b.disabled=false); } };
+  /* Кнопка срабатывает, только если нажатие началось на ней самой: выделение текста мышью в поле не может случайно отправить комментарий. */
+  const okBtn=f.querySelector('[data-ok]'); let armed=false;
+  f.addEventListener('pointerdown',e=>{ armed=e.target.closest('[data-ok]')===okBtn; },true);
+  let busy=false;
+  async function send(){ if(busy) return; const text=ta.value.trim(); if(!text){ ta.focus({preventScroll:true}); return; } busy=true; f.dataset.sending='1'; const btns=f.querySelectorAll('button'); btns.forEach(b=>b.disabled=true); const sel=f.querySelector('select'); try{ await opts.onOk(text, sel?sel.value:(opts.shares&&opts.shares[0]?opts.shares[0].id:null)); }catch(err){ f.querySelector('[data-msg]').textContent=humanErr(err); btns.forEach(b=>b.disabled=false); delete f.dataset.sending; } busy=false; }
+  okBtn.onclick=e=>{ e.stopPropagation(); if(e.detail>0&&!armed) return; armed=false; send(); };
   return f;
 }
+
+/* Перерисовка комментариев (опрос облака, возврат на вкладку) не должна стирать недописанный текст. */
+function keepComposers(root){
+  if(!root) return [];
+  return [...root.querySelectorAll('.rk-bc-compose')].filter(f=>!f.dataset.sending&&!f.dataset.edit).map(f=>{
+    const thread=f.closest('.rk-bc-thread'), blk=f.closest('.blk'), focused=f.contains(document.activeElement);
+    const ta=f.querySelector('textarea'); const sel=ta?[ta.selectionStart,ta.selectionEnd]:null;
+    const item=thread?{kind:'thread',key:thread.dataset.id,f}:f.closest('.rk-bc-general')?{kind:'general',f}:blk?{kind:'slot',key:blk.dataset.id,f}:null;
+    if(item){ item.focused=focused; item.sel=sel; f.remove(); } return item;
+  }).filter(Boolean);
+}
+function restoreComposers(root,list,editMode){
+  list.forEach(it=>{ let ok=false;
+    if(it.kind==='thread'){ const card=root.querySelector('.rk-bc-thread[data-id="'+CSS_escape(it.key)+'"]'); if(card){ card.appendChild(it.f); ok=true; } }
+    else if(it.kind==='general'){ const gen=root.querySelector('.rk-bc-general'); if(gen){ gen.prepend(it.f); ok=true; } }
+    else { const el=root.querySelector('.blk[data-id="'+CSS_escape(it.key)+'"]'); if(el){ let slot=el.querySelector('.rk-bc-slot'); if(!slot){ slot=document.createElement('div'); slot.className='rk-bc-slot'; slot.contentEditable='false'; slotHost(el,editMode).appendChild(slot); } slot.prepend(it.f); ok=true; } }
+    if(ok&&it.focused){ const ta=it.f.querySelector('textarea'); try{ ta.focus({preventScroll:true}); if(it.sel) ta.setSelectionRange(it.sel[0],it.sel[1]); }catch(e){} }
+  });
+}
+function composing(root){ return !!root&&[...root.querySelectorAll('.rk-bc-compose:not([data-sending]) textarea')].some(t=>t.value.trim()||document.activeElement===t); }
 const commentControls=new WeakMap();
 function commentPreferenceKey(){return 'rk:comments-layout:v1:'+(user()?.id||'local')+':'+(betaMatch?betaMatch[1]:'author');}
 const commentLayouts=new Map();
@@ -191,7 +241,6 @@ function packCommentCards(items,activeId,viewportTop,textBottom){
   let bottom=0;
   return items.map(item=>{
     let target=item.anchor;
-    if(item.id===activeId)target=Math.max(target,Math.min(viewportTop,Math.max(target,textBottom-item.height)));
     const top=Math.max(0,target,bottom);
     bottom=top+item.height+12;
     return {...item,top};
@@ -329,6 +378,7 @@ const api={
   async comments(where){ let q=sb().from('rk_comments').select('*'); for(const k in where){ if(Array.isArray(where[k])) q=q.in(k,where[k]); else q=q.eq(k,where[k]); } const {data,error}=await q.order('created_at'); if(error) throw error; if(!betaMatch&&where.owner_id===user()?.id){return (data||[]).concat(privateComments().filter(c=>c.author_id===user().id&&Object.entries(where).every(([k,v])=>Array.isArray(v)?v.includes(c[k]):c[k]===v)));} return data||[]; },
   async insertComment(row){ if(!betaMatch&&row.role==='author')return draftComment(row); const {data,error}=await sb().from('rk_comments').insert(row).select('*').single(); if(error) throw error; return data; },
   async setDone(id,done){ const draft=privateById(id);if(draft){savePrivate(privateComments().map(c=>c.id===id?{...c,done}:c));return;} const {error}=await sb().from('rk_comments').update({done}).eq('id',id); if(error) throw error; },
+  async updateComment(id,body){ const draft=privateById(id);if(draft){savePrivate(privateComments().map(c=>c.id===id?{...c,body}:c));return;} const {data,error}=await sb().from('rk_comments').update({body}).eq('id',id).select('id,body'); if(error) throw error; if(Array.isArray(data)&&data.length&&data[0].body!==body) throw Error('Облако не приняло правку'); },
   async deleteComment(id){ const draft=privateById(id);if(draft){savePrivate(privateComments().filter(c=>c.id!==id).map(c=>c.parent_id===id?{...c,parent_id:null}:c));return;} const {error}=await sb().from('rk_comments').delete().eq('id',id); if(error) throw error; }
 };
 
@@ -477,8 +527,9 @@ function authorSide(){
     const ctx={role:'author',uid:me,colors:col,canResolve:true,onPublish:async c=>{await publishPrivate(c);await decorate(p,host,true);},
       onReply:async(root,text)=>{ await api.insertComment({share_id:root.share_id,owner_id:me,page_id:p.id,parent_id:root.id,body:text,role:'author',author_id:me,author_name:'Автор'}); await decorate(p,host,true); },
       onDone:async root=>{ try{ await api.setDone(root.id,!root.done); await decorate(p,host,true); }catch(e){ toast(humanErr(e)); } },
+      onEdit:async(c,text)=>{ await api.updateComment(c.id,text); await decorate(p,host,true); },
       onDelete:async id=>{ try{ await api.deleteComment(id); await decorate(p,host,true); }catch(e){ toast(humanErr(e)); } }};
-    decorating=true;
+    decorating=true; const kept=keepComposers(host);
     try{
       const head=host.querySelector('.page-head'); const blocks=host.querySelector('.blocks');
       host.querySelectorAll('.rk-bc-bar,.rk-bc-general').forEach(x=>x.remove());
@@ -487,7 +538,7 @@ function authorSide(){
         const btn=document.createElement('button'); btn.type='button'; btn.className='btn'; btn.textContent='Комментарий к главе'; btn.disabled=!active.length; btn.title=active.length?'':'Нет активных ссылок для этой главы';
         const bar=filterBar(state,()=>decorate(p,host,false),btn);
         const gen=document.createElement('div'); gen.className='rk-bc-general'; gen.contentEditable='false';
-        btn.onclick=()=>{ if(gen.querySelector('.rk-bc-compose')) return; const f=composer({ok:'Сохранить',placeholder:'Комментарий ко всей главе…',shares:active.map(s=>({id:s.id,label:s.editor_email})),onOk:async(text,sid)=>{ await api.insertComment({share_id:sid,owner_id:me,page_id:p.id,body:text,role:'author',author_id:me,author_name:'Автор'}); await decorate(p,host,true); },onCancel:()=>f.remove()}); gen.prepend(f); f.querySelector('textarea').focus(); };
+        btn.onclick=()=>{ if(gen.querySelector('.rk-bc-compose')) return; const f=composer({ok:'Сохранить',placeholder:'Комментарий ко всей главе…',shares:active.map(s=>({id:s.id,label:s.editor_email})),onOk:async(text,sid)=>{ await api.insertComment({share_id:sid,owner_id:me,page_id:p.id,body:text,role:'author',author_id:me,author_name:'Автор'}); await decorate(p,host,true); },onCancel:()=>f.remove()}); gen.prepend(f); focusComposer(f); };
         shown.filter(t=>!t.root.block_id).forEach(t=>gen.appendChild(threadCard(t,ctx)));
         head.after(bar,gen);
       }
@@ -497,6 +548,7 @@ function authorSide(){
         for(const bid in byBlock){ const el=blocks.querySelector('.blk[data-id="'+CSS_escape(bid)+'"]'); if(!el) continue; const slot=document.createElement('div'); slot.className='rk-bc-slot'; slot.contentEditable='false'; byBlock[bid].forEach(t=>slot.appendChild(threadCard(t,ctx))); slotHost(el,B().mode==='edit').appendChild(slot); }
         if(B().mode!=='edit') paint(blocks,shown,col); else unpaint(blocks);
       }
+      restoreComposers(host,kept,B().mode==='edit');
     } finally { setTimeout(()=>{ decorating=false; },0); }
   }
   /* блоки перерисовываются без renderPage (rerender) — возвращаем карточки */
@@ -521,15 +573,15 @@ function authorSide(){
     if(slot.querySelector('.rk-bc-compose')) return;
     const active=activeSharesForPage(cp.id); const me=user().id;
     const f=composer({ok:'Сохранить',quote:s.quote,placeholder:'Комментарий к фрагменту…',shares:active.map(x=>({id:x.id,label:x.editor_email})),onOk:async(text,sid)=>{ await api.insertComment({share_id:sid,owner_id:me,page_id:cp.id,block_id:s.block_id,o1:s.o1,o2:s.o2,quote:s.quote,body:text,role:'author',author_id:me,author_name:'Автор'}); await decorate(cp,host,true); },onCancel:()=>{ f.remove(); if(!slot.children.length) slot.remove(); }});
-    slot.prepend(f); f.querySelector('textarea').focus();
+    slot.prepend(f); focusComposer(f);
   }
   let selT=null; document.addEventListener('selectionchange',()=>{ clearTimeout(selT); selT=setTimeout(checkSelection,160); });
   window.addEventListener('scroll',()=>{ if(bubble&&!bubble.hidden) checkSelection(); },{passive:true});
   document.addEventListener('click',e=>{ const m=e.target.closest&&e.target.closest('mark.rk-bc-mark'); if(!m) return; const sel=getSelection(); if(sel&&!sel.isCollapsed) return; const card=document.querySelector('.rk-bc-thread[data-id="'+CSS_escape(m.dataset.bc)+'"]'); if(card){ e.preventDefault(); e.stopPropagation(); card.scrollIntoView({block:'center',behavior:'smooth'}); card.classList.add('hot'); setTimeout(()=>card.classList.remove('hot'),1600); } },true);
 
   /* --- опрос облака --- */
-  function poll(){ clearInterval(pollTimer); pollTimer=setInterval(async()=>{ if(document.visibilityState!=='visible'||!ready()) return; const cp=B()&&B().curPage; if(!cp||!shares||!isShared(cp.id)) return; const before=JSON.stringify((comments[cp.id]||[]).map(c=>[c.id,c.done,c.body])); try{ const list=await api.comments({owner_id:user().id,page_id:cp.id}); const after=JSON.stringify(list.map(c=>[c.id,c.done,c.body])); if(after!==before){ comments[cp.id]=list; decorateCurrent(false); } }catch(e){} },45000); }
-  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&ready()){ const cp=B()&&B().curPage; if(cp&&shares&&isShared(cp.id)) decorateCurrent(true); } });
+  function poll(){ clearInterval(pollTimer); pollTimer=setInterval(async()=>{ if(document.visibilityState!=='visible'||!ready()) return; const cp=B()&&B().curPage; if(!cp||!shares||!isShared(cp.id)) return; const before=JSON.stringify((comments[cp.id]||[]).map(c=>[c.id,c.done,c.body])); try{ const list=await api.comments({owner_id:user().id,page_id:cp.id}); const after=JSON.stringify(list.map(c=>[c.id,c.done,c.body])); if(after!==before&&!composing(document.getElementById('view'))){ comments[cp.id]=list; decorateCurrent(false); } }catch(e){} },45000); }
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&ready()&&!composing(document.getElementById('view'))){ const cp=B()&&B().curPage; if(cp&&shares&&isShared(cp.id)) decorateCurrent(true); } });
 
   window.RK_BETA={
     available:()=>!!sb(),
@@ -691,11 +743,11 @@ function betaScreen(shareId){
     const check=()=>{ const v=root.querySelector('#rkBetaView'); const s=v&&selectionIn(v); if(!s){ bubble.hidden=true; pending=null; return; } pending=s; bubble.hidden=false; const w=bubble.offsetWidth; let left=Math.max(8,Math.min(s.rect.left+s.rect.width/2-w/2,innerWidth-w-8)); let top=s.rect.top-42; const bar=root.querySelector('.rk-beta-bar'); if(top<((bar&&bar.offsetHeight)||0)+6) top=s.rect.bottom+8; bubble.style.left=left+'px'; bubble.style.top=top+'px'; };
     document.addEventListener('selectionchange',()=>{ clearTimeout(selT); selT=setTimeout(check,140); });
     window.addEventListener('scroll',()=>{ if(!bubble.hidden) check(); },{passive:true});
-    bubble.onclick=()=>{ const s=pending; bubble.hidden=true; pending=null; if(!s) return; try{ getSelection().removeAllRanges(); }catch(e){} const el=root.querySelector('.blk[data-id="'+CSS_escape(s.block_id)+'"]'); if(!el) return; let slot=el.querySelector('.rk-bc-slot'); if(!slot){ slot=document.createElement('div'); slot.className='rk-bc-slot'; slotHost(el,false).appendChild(slot); } if(slot.querySelector('.rk-bc-compose')) return; const f=composer({quote:s.quote,placeholder:'Комментарий к фрагменту…',onOk:async text=>{ await post({block_id:s.block_id,o1:s.o1,o2:s.o2,quote:s.quote,body:text}); },onCancel:()=>{ f.remove(); if(!slot.children.length) slot.remove(); }}); slot.prepend(f); f.querySelector('textarea').focus(); };
+    bubble.onclick=()=>{ const s=pending; bubble.hidden=true; pending=null; if(!s) return; try{ getSelection().removeAllRanges(); }catch(e){} const el=root.querySelector('.blk[data-id="'+CSS_escape(s.block_id)+'"]'); if(!el) return; let slot=el.querySelector('.rk-bc-slot'); if(!slot){ slot=document.createElement('div'); slot.className='rk-bc-slot'; slotHost(el,false).appendChild(slot); } if(slot.querySelector('.rk-bc-compose')) return; const f=composer({quote:s.quote,placeholder:'Комментарий к фрагменту…',onOk:async text=>{ await post({block_id:s.block_id,o1:s.o1,o2:s.o2,quote:s.quote,body:text}); },onCancel:()=>{ f.remove(); if(!slot.children.length) slot.remove(); }}); slot.prepend(f); focusComposer(f); };
     document.addEventListener('click',e=>{ const m=e.target.closest&&e.target.closest('mark.rk-bc-mark'); if(!m) return; const sel=getSelection(); if(sel&&!sel.isCollapsed) return; const card=root.querySelector('.rk-bc-thread[data-id="'+CSS_escape(m.dataset.bc)+'"]'); if(card){ e.preventDefault(); card.scrollIntoView({block:'center',behavior:'smooth'}); card.classList.add('hot'); setTimeout(()=>card.classList.remove('hot'),1600); } },true);
   }
   async function post(extra){ const row=Object.assign({share_id:share.id,owner_id:share.owner_id,page_id:cur.id,role:'editor',author_id:me().id,author_name:me().email||'',done:false},extra); await api.insertComment(row); await refreshComments(true); }
-  async function refreshComments(silent){ try{ const list=await api.comments({share_id:share.id,page_id:cur.id}); const before=JSON.stringify(comments.map(c=>[c.id,c.done,c.body])); const after=JSON.stringify(list.map(c=>[c.id,c.done,c.body])); comments=list; if(after!==before||!silent) renderComments(); }catch(e){ if(!silent) toast(humanErr(e)); } }
+  async function refreshComments(silent){ if(silent&&composing(root)) return; try{ const list=await api.comments({share_id:share.id,page_id:cur.id}); const before=JSON.stringify(comments.map(c=>[c.id,c.done,c.body])); const after=JSON.stringify(list.map(c=>[c.id,c.done,c.body])); comments=list; if((after!==before||!silent)&&!(silent&&composing(root))) renderComments(); }catch(e){ if(!silent) toast(humanErr(e)); } }
   async function show(c){
     cur=c; const sel=root.querySelector('#rkBetaChapter'); if(sel&&sel.value!==c.id) sel.value=c.id;
     try{ history.replaceState(null,'','#/beta/'+shareId+'/'+c.id); }catch(e){}
@@ -712,16 +764,19 @@ function betaScreen(shareId){
     const col=Object.assign(DEFAULT_COLORS((share.look||{}).palette||'base'),share.colors||{}); const shown=visibleThreads(threads,state);
     const ctx={role:'editor',uid:me().id,colors:col,canResolve:false,
       onReply:async(rootC,text)=>{ await post({parent_id:rootC.id,body:text}); },
+      onEdit:async(c,text)=>{ await api.updateComment(c.id,text); await refreshComments(false); },
       onDone:()=>{}, onDelete:async id=>{ try{ await api.deleteComment(id); await refreshComments(false); }catch(e){ toast(humanErr(e)); } }};
+    const kept=keepComposers(v);
     v.querySelectorAll('.rk-bc-bar,.rk-bc-general,.rk-bc-slot').forEach(x=>x.remove());
     const btn=document.createElement('button'); btn.type='button'; btn.className='btn'; btn.textContent='Комментарий к главе';
     const bar=filterBar(state,renderComments,btn); const gen=document.createElement('div'); gen.className='rk-bc-general';
-    btn.onclick=()=>{ if(gen.querySelector('.rk-bc-compose')) return; const f=composer({placeholder:'Комментарий ко всей главе…',onOk:async text=>{ await post({body:text}); },onCancel:()=>f.remove()}); gen.prepend(f); f.querySelector('textarea').focus(); };
+    btn.onclick=()=>{ if(gen.querySelector('.rk-bc-compose')) return; const f=composer({placeholder:'Комментарий ко всей главе…',onOk:async text=>{ await post({body:text}); },onCancel:()=>f.remove()}); gen.prepend(f); focusComposer(f); };
     shown.filter(t=>!t.root.block_id).forEach(t=>gen.appendChild(threadCard(t,ctx)));
     head.after(bar,gen);
     const byBlock={}; shown.filter(t=>t.root.block_id).forEach(t=>(byBlock[t.root.block_id]=byBlock[t.root.block_id]||[]).push(t));
     for(const bid in byBlock){ const el=blocks.querySelector('.blk[data-id="'+CSS_escape(bid)+'"]'); if(!el) continue; const slot=document.createElement('div'); slot.className='rk-bc-slot'; byBlock[bid].forEach(t=>slot.appendChild(threadCard(t,ctx))); slotHost(el,false).appendChild(slot); }
     paint(blocks,shown,col);
+    restoreComposers(v,kept,false);
   }
   return start;
 }

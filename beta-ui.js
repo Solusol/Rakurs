@@ -93,11 +93,11 @@ html:root body ${ROOT}:not(.rk-unified-side)::after{content:none!important}
 html:root body ${ROOT}:not(.rk-unified-side) :is(.rk-bc-slot,.rk-bc-general)>.rk-bc-thread,
 html:root body ${ROOT}:not(.rk-unified-side) :is(.rk-bc-slot,.rk-bc-general)>.rk-bc-compose{position:relative!important;top:auto!important;right:auto!important;left:auto!important;width:auto!important;clip-path:none!important}
 html:root body ${ROOT}.rk-unified-side{position:relative!important;max-width:1600px!important;--rk-comment-tail:0px!important}
-html:root body ${ROOT}.rk-unified-side .blocks{position:static!important;width:calc(100% - 324px)!important;max-width:none!important;box-sizing:border-box!important;margin-inline:0!important}
+html:root body ${ROOT}.rk-unified-side .blocks{position:static!important;width:calc(100% - 364px)!important;max-width:none!important;box-sizing:border-box!important;margin-inline:0!important}
 html:root body ${ROOT}.rk-unified-side .blocks>.blk{display:block!important;position:static!important;min-height:0!important;grid-template-columns:none!important}
 html:root body ${ROOT}.rk-unified-side .blocks>.blk>.body{grid-column:auto!important;grid-row:auto!important;min-width:0}
 html:root body ${ROOT}.rk-unified-side :is(.noteslot,.rk-bc-slot,.rk-bc-general){display:contents!important;position:static!important}
-html:root body ${ROOT}.rk-unified-side .rk-u-card{position:absolute!important;top:var(--rk-u-top,0px)!important;right:var(--rk-u-right,28px)!important;left:auto!important;width:300px!important;max-width:300px!important;min-width:0!important;box-sizing:border-box!important;margin:0!important;z-index:2;clip-path:inset(var(--rk-u-clip-top,0px) 0 var(--rk-u-clip-bottom,0px) 0)!important;overflow-wrap:anywhere}
+html:root body ${ROOT}.rk-unified-side .rk-u-card{position:absolute!important;top:var(--rk-u-top,0px)!important;right:var(--rk-u-right,28px)!important;left:auto!important;width:340px!important;max-width:340px!important;min-width:0!important;box-sizing:border-box!important;margin:0!important;z-index:2;clip-path:inset(var(--rk-u-clip-top,0px) 0 var(--rk-u-clip-bottom,0px) 0)!important;overflow-wrap:anywhere}
 html:root body ${ROOT}.rk-unified-side .note.rk-u-card{background:var(--rk-bg,var(--bg))!important;color:var(--rk-text,var(--text))!important;border:1px solid var(--rk-line,var(--line))!important;border-left:4px solid var(--rk-secondary,var(--green))!important;box-shadow:none!important;border-radius:4px;padding:10px 12px 8px!important;font-size:15px;line-height:1.45}
 html:root body ${ROOT}.rk-unified-side .note.rk-u-card :is(.q,.meta,.link){color:inherit!important}
 html:root body ${ROOT}.rk-unified-side .rk-u-card.rk-u-active{outline:1px solid var(--rk-text,var(--text));outline-offset:2px}
@@ -120,12 +120,7 @@ function sideWanted(host){
 function pack(items,selected,viewportTop,textBottom){
  let bottom=0;
  const out=items.map(item=>{const top=Math.max(item.anchor,bottom);bottom=top+item.height+12;return {...item,top};});
- const index=out.findIndex(item=>item.key===selected);
- if(index<0)return out;
- const item=out[index];
- item.top=Math.max(item.anchor,Math.min(viewportTop,Math.max(item.anchor,textBottom-item.height)));
- for(let i=index-1;i>=0;i--)out[i].top=Math.min(out[i].top,out[i+1].top-out[i].height-12);
- for(let i=index+1;i<out.length;i++)out[i].top=Math.max(out[i].anchor,out[i-1].top+out[i-1].height+12);
+ /* Карточки стоят у своих фрагментов и не прыгают при клике: активная карточка только подсвечивается. */
  return out;
 }
 function viewport(host){
