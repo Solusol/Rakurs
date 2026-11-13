@@ -67,3 +67,45 @@ html:root body :is(#view,#view2Body,#rkBetaView) :is(.rk-bc-thread.rk-bc-thread.
   outline: 2px solid var(--rk-comment-fg) !important;
   outline-offset: 2px;
 }
+
+/* Character scales: outline cells with sequential marks, never solid fill. */
+html:root body :is(#view,#view2Body) .rk-character-designer .cc-segments {
+  counter-reset: rk-character-step;
+}
+html:root body :is(#view,#view2Body) .rk-character-designer .cc-cell.cc-cell {
+  counter-increment: rk-character-step;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent !important;
+  color: var(--ci, currentColor) !important;
+  box-shadow: none !important;
+}
+html:root body :is(#view,#view2Body) .rk-character-designer .cc-cell.cc-cell::after {
+  content: none;
+  pointer-events: none;
+}
+html:root body :is(#view,#view2Body) .rk-character-designer .cc-cell.cc-cell.cc-filled::after {
+  content: counter(rk-character-step);
+  display: block;
+  color: inherit;
+  font-family: var(--hand);
+  font-size: .85em;
+  line-height: 1;
+  text-align: center;
+  pointer-events: none;
+}
+/* Show the entire portrait, including its decorative frame. */
+html:root body :is(#view,#view2Body) .ws-card:is([data-ws-kind="character"],[data-ws-kind="location"]) .ws-card-image {
+  display: block;
+  width: 100% !important;
+  height: auto !important;
+  max-width: 100% !important;
+  max-height: none !important;
+  aspect-ratio: auto !important;
+  object-fit: contain !important;
+  object-position: center !important;
+  border-radius: 0 !important;
+  flex: 0 0 auto;
+}
