@@ -134,3 +134,8 @@ html:root body :is(#view,#view2Body) .rk-character-designer[data-edit="1"] .cc-s
 html:root body :is(#view,#view2Body) .rk-character-designer[data-edit="1"] .cc-stage {
   overflow: visible !important;
 }
+
+/* Loaded media needs no extra plus beneath it; keep empty-media and toolbar controls. */
+html:root body :is(#view,#view2Body) .rk-character-designer .cc-item:has(.cc-media) .cc-content button:not(.cc-item-tools button) {
+  display: none !important;
+}
