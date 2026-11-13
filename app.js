@@ -2675,7 +2675,54 @@ function rkCharacterDesigner(host,p,data){
   const extra=it.type==='segments'?'<div class="field"><label>Количество делений</label><input type="number" data-cc="count" min="2" max="30" value="'+clamp(number(it.count,10),2,30)+'"></div>':it.type==='media'?'<div class="field"><label>Отображение</label><select data-cc="fit"><option value="contain"'+(it.fit!=='cover'?' selected':'')+'>Целиком</option><option value="cover"'+(it.fit==='cover'?' selected':'')+'>Заполнить рамку</option></select></div>':'';
   dlg('Настройки элемента','<div class="field"><label>Ширина / высота</label><div class="row-btns"><input type="number" data-cc="w" value="'+it.w+'" min="160" max="960" aria-label="Ширина"><input type="number" data-cc="h" value="'+it.h+'" min="80" max="4000" aria-label="Высота"></div></div><div class="field"><label>Размер текста</label><input type="number" data-cc="font" min="12" max="48" value="'+it.font+'"></div><div class="field"><label>Выравнивание</label><select data-cc="align">'+[['left','Слева'],['center','По центру'],['right','Справа']].map(([v,t])=>'<option value="'+v+'"'+((it.align||'left')===v?' selected':'')+'>'+t+'</option>').join('')+'</select></div><label><input type="checkbox" data-cc="border"'+(it.border?' checked':'')+'> Показывать рамку в чтении</label>'+extra,m=>{if(!editable())return false;const found=model.items.find(x=>x.id===it.id);if(!found)return false;it=found;checkpoint();for(const k of ['w','h','font','count']){const input=m.querySelector('[data-cc='+k+']');if(input)it[k]=number(input.value,it[k]);}it.align=m.querySelector('[data-cc=align]').value;it.border=m.querySelector('[data-cc=border]').checked;const fit=m.querySelector('[data-cc=fit]');if(fit)it.fit=fit.value;if(it.type==='segments'){it.count=clamp(Math.round(it.count),2,30);it.value=clamp(number(it.value,0),0,it.count);}normalize(it);return commit(true);});
  }
- function geometry(n,it){n.style.left=it.x+'px';n.style.top=it.y+'px';n.style.width=it.w+'px';n.style.height=it.h+'px';const bar=n.querySelector('.cc-item-tools');if(bar){bar.style.left=it.x>500?'auto':'0';bar.style.right=it.x>500?'0':'auto';}const square=n.querySelector('.cc-matrix');if(square){const size=Math.max(50,Math.min(it.w-26,it.h-72));square.style.width=size+'px';square.style.height=size+'px';}}
+
+ /* Per-item background, stored in the same model as the other block settings. */
+ function ccAutoInk(hex){
+  const c=hex.slice(1).match(/../g).map(x=>{const v=parseInt(x,16)/255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4);});
+  const l=c[0]*.2126+c[1]*.7152+c[2]*.0722;
+  return (l+.05)/.05>=1.05/(l+.05)?'#000000':'#ffffff';
+ }
+ function ccPaintBlock(n,it){
+  const bg=/^#[0-9a-f]{6}$/i.test(it.blockColor||'')?it.blockColor:null;
+  if(!bg){if(n.dataset.ccOwnColor){['background-color','color','--ci','--cp'].forEach(k=>n.style.removeProperty(k));delete n.dataset.ccOwnColor;}return;}
+  const ink=ccAutoInk(bg);n.dataset.ccOwnColor='1';
+  n.style.setProperty('background-color',bg,'important');n.style.setProperty('color',ink,'important');
+  n.style.setProperty('--ci',ink,'important');n.style.setProperty('--cp',bg,'important');
+ }
+ function ccColorSettings(it){
+  const m=document.getElementById('specialModal'),ok=m?.querySelector('#spOk'),body=m?.querySelector('.dlgbox-body');
+  if(!m||m.hidden||!ok||!body||body.querySelector('[data-cc-block-color]'))return;
+  const current=model.items.find(x=>x.id===it.id);if(!current)return;
+  const own=/^#[0-9a-f]{6}$/i.test(current.blockColor||'');
+  const section=document.createElement('fieldset');section.dataset.ccBlockColor='1';
+  section.innerHTML='<legend>Цвет блока</legend><label style="display:flex;gap:12px;align-items:center">Цвет фона <input type="color" aria-label="Цвет фона блока"></label><label style="display:flex;gap:10px;align-items:center;margin-top:10px"><input type="checkbox"> Как у карточки — без собственной заливки</label><p class="muted" style="margin-top:8px">Текст и линии автоматически станут чёрными или белыми для контраста.</p>';
+  const color=section.querySelector('input[type=color]'),reset=section.querySelector('input[type=checkbox]');
+  const inherited=getComputedStyle(root).getPropertyValue('--cp').trim();
+  color.value=own?current.blockColor:(/^#[0-9a-f]{6}$/i.test(inherited)?inherited:'#e5e0cf');reset.checked=!own;
+  color.addEventListener('input',()=>{reset.checked=false;});body.appendChild(section);
+  const original=ok.onclick;
+  if(typeof original!=='function'){section.remove();return;}
+  ok.onclick=function(e){
+   if(!editable())return;
+   const value=reset.checked?null:color.value;
+   original.call(this,e);
+   if(!m.hidden)return;
+   const target=model.items.find(x=>x.id===it.id);if(!target||!editable())return;
+   if((target.blockColor||null)===value)return;
+   change(()=>{if(value)target.blockColor=value;else delete target.blockColor;},true);
+  };
+ }
+ function ccEnhanceBlock(n,it){
+  ccPaintBlock(n,it);if(!editable())return;
+  const bar=n.querySelector('.cc-item-tools');if(!bar)return;
+  const buttons=[...bar.querySelectorAll('button')];
+  const button=buttons.find(b=>/настрой|редакт|параметр/i.test(b.title||b.getAttribute('aria-label')||''))||(buttons[0]?.classList.contains('cc-move')?buttons[1]:null);
+  if(!button||button.dataset.ccColorHook||typeof button.onclick!=='function')return;
+  const original=button.onclick;button.dataset.ccColorHook='1';
+  button.onclick=function(e){const result=original.call(this,e);ccColorSettings(it);return result;};
+ }
+
+ function geometry(n,it){ccEnhanceBlock(n,it);n.style.left=it.x+'px';n.style.top=it.y+'px';n.style.width=it.w+'px';n.style.height=it.h+'px';const bar=n.querySelector('.cc-item-tools');if(bar){bar.style.left=it.x>500?'auto':'0';bar.style.right=it.x>500?'0':'auto';}const square=n.querySelector('.cc-matrix');if(square){const size=Math.max(50,Math.min(it.w-26,it.h-72));square.style.width=size+'px';square.style.height=size+'px';}}
  function drag(e,it,node,resizing){if(!editable()||e.button!==0||e.isPrimary===false)return;e.preventDefault();e.stopPropagation();pick(it.id);const before=clone(model),old=clone(it),length=history.undo.length;checkpoint();const ac=new AbortController(),sig=ac.signal,rect=stage.getBoundingClientRect(),sx=(e.clientX-rect.left)/scale,sy=(e.clientY-rect.top)/scale;let changed=false;
   const snap=(v,ev)=>model.grid&&!ev.altKey?Math.round(v/20)*20:v;
   let lastEv=null,raf=0;
