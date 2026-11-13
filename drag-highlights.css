@@ -143,7 +143,7 @@ html:root body :is(#view,#view2Body) .rk-character-designer .cc-item:has(.cc-med
 /* Keep the constructor's main controls available while scrolling. */
 html:root body #view .rk-character-designer > .cc-tools {
   position: sticky !important;
-  top: var(--barh, 0px) !important;
+  top: max(0px, calc(var(--barh, 0px) - 1px)) !important;
   z-index: 10001 !important;
   background: var(--cp, var(--rk-bg, var(--bg))) !important;
   padding-block: 4px;
