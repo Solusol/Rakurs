@@ -1,0 +1,36 @@
+name: Install character block colors
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/character-block-colors.yml'
+      - 'scripts/patch_character_colors.py'
+      - 'scripts/character_block_colors.fragment.js'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: install-character-block-colors
+  cancel-in-progress: false
+jobs:
+  install:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply source-locked color settings
+        run: python scripts/patch_character_colors.py
+      - name: Check JavaScript
+        run: |
+          node --check app.js
+          node --check sw.js
+      - name: Commit application changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app.js sw.js
+          git diff --cached --quiet && exit 0
+          git commit -m 'Add per-block background and automatic contrasting text to character settings'
+          git push origin HEAD:main
