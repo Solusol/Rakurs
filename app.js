@@ -2663,7 +2663,7 @@ function rkCharacterDesigner(host,p,data){
   stage.style.height=height+'px';stage.style.transform='scale('+scale+')';sizer.style.height=Math.ceil(height*scale)+'px';}
  const observer=new ResizeObserver(fit);observer.observe(sizer);
  {let raf=0;const onScroll=()=>{if(!raf)raf=requestAnimationFrame(()=>{raf=0;if(root.isConnected)fit();});};(scroller||window).addEventListener('scroll',onScroll,{passive:true,signal});window.addEventListener('resize',onScroll,{passive:true,signal});}
- function pick(id){selected=id;stage.querySelectorAll('.cc-item').forEach(n=>n.classList.toggle('cc-selected',n.dataset.element===id));}
+ function pick(id){ccPick(id);}
  function add(type){if(!editable())return;checkpoint();const it={id:uid(),type,x:40,y:model.items.length?Math.max(...model.items.map(x=>x.y+x.h))+40:40,w:440,h:240,font:18,title:'',text:'',border:false};
   if(type==='media'){it.h=340;it.fit='contain';}if(type==='matrix'){it.w=380;it.h=440;it.point=null;it.left='';it.right='';it.top='';it.bottom='';}if(type==='range'){it.h=170;it.value=null;it.left='';it.right='';}if(type==='segments'){it.h=150;it.value=0;it.count=10;}if(type==='lines'||type==='checklist')it.rows=[{id:uid(),text:'',checked:false}];if(type==='heading')it.h=100;if(type==='divider')it.h=80;
   model.items.push(it);model.introDismissed=true;selected=it.id;menu.hidden=true;addButton.setAttribute('aria-expanded','false');if(commit(true))stage.querySelector('[data-element="'+CSS.escape(it.id)+'"]')?.scrollIntoView({block:'nearest'});
@@ -2673,7 +2673,7 @@ function rkCharacterDesigner(host,p,data){
  function layer(it,front){change(()=>{model.items.splice(model.items.indexOf(it),1);if(front)model.items.push(it);else model.items.unshift(it);},true);}
  function settings(it){if(!editable())return;
   const extra=it.type==='segments'?'<div class="field"><label>Количество делений</label><input type="number" data-cc="count" min="2" max="30" value="'+clamp(number(it.count,10),2,30)+'"></div>':it.type==='media'?'<div class="field"><label>Отображение</label><select data-cc="fit"><option value="contain"'+(it.fit!=='cover'?' selected':'')+'>Целиком</option><option value="cover"'+(it.fit==='cover'?' selected':'')+'>Заполнить рамку</option></select></div>':'';
-  dlg('Настройки элемента','<div class="field"><label>Ширина / высота</label><div class="row-btns"><input type="number" data-cc="w" value="'+it.w+'" min="160" max="960" aria-label="Ширина"><input type="number" data-cc="h" value="'+it.h+'" min="80" max="4000" aria-label="Высота"></div></div><div class="field"><label>Размер текста</label><input type="number" data-cc="font" min="12" max="48" value="'+it.font+'"></div><div class="field"><label>Выравнивание</label><select data-cc="align">'+[['left','Слева'],['center','По центру'],['right','Справа']].map(([v,t])=>'<option value="'+v+'"'+((it.align||'left')===v?' selected':'')+'>'+t+'</option>').join('')+'</select></div><label><input type="checkbox" data-cc="border"'+(it.border?' checked':'')+'> Показывать рамку в чтении</label>'+extra,m=>{if(!editable())return false;const found=model.items.find(x=>x.id===it.id);if(!found)return false;it=found;checkpoint();for(const k of ['w','h','font','count']){const input=m.querySelector('[data-cc='+k+']');if(input)it[k]=number(input.value,it[k]);}it.align=m.querySelector('[data-cc=align]').value;it.border=m.querySelector('[data-cc=border]').checked;const fit=m.querySelector('[data-cc=fit]');if(fit)it.fit=fit.value;if(it.type==='segments'){it.count=clamp(Math.round(it.count),2,30);it.value=clamp(number(it.value,0),0,it.count);}normalize(it);return commit(true);});
+  dlg('Настройки элемента','<div class="field"><label>Ширина / высота</label><div class="row-btns"><input type="number" data-cc="w" value="'+it.w+'" min="160" max="960" aria-label="Ширина"><input type="number" data-cc="h" value="'+it.h+'" min="80" max="4000" aria-label="Высота"></div></div><div class="field"><label>Размер текста</label><input type="number" data-cc="font" min="12" max="48" value="'+it.font+'"></div><label><input type="checkbox" data-cc="hideTitle"'+(it.hideTitle?' checked':'')+'> Убрать заголовок</label><div class="field"><label>Выравнивание</label><select data-cc="align">'+[['left','Слева'],['center','По центру'],['right','Справа']].map(([v,t])=>'<option value="'+v+'"'+((it.align||'left')===v?' selected':'')+'>'+t+'</option>').join('')+'</select></div><label><input type="checkbox" data-cc="border"'+(it.border?' checked':'')+'> Показывать рамку в чтении</label>'+extra,m=>{if(!editable())return false;const found=model.items.find(x=>x.id===it.id);if(!found)return false;it=found;checkpoint();for(const k of ['w','h','font','count']){const input=m.querySelector('[data-cc='+k+']');if(input)it[k]=number(input.value,it[k]);}it.align=m.querySelector('[data-cc=align]').value;it.border=m.querySelector('[data-cc=border]').checked;it.hideTitle=m.querySelector('[data-cc=hideTitle]').checked;const fit=m.querySelector('[data-cc=fit]');if(fit)it.fit=fit.value;if(it.type==='segments'){it.count=clamp(Math.round(it.count),2,30);it.value=clamp(number(it.value,0),0,it.count);}normalize(it);return commit(true);});
  }
 
  /* Per-item background, stored in the same model as the other block settings. */
@@ -2722,8 +2722,77 @@ function rkCharacterDesigner(host,p,data){
   button.onclick=function(e){const result=original.call(this,e);ccColorSettings(it);return result;};
  }
 
- function geometry(n,it){ccEnhanceBlock(n,it);n.style.left=it.x+'px';n.style.top=it.y+'px';n.style.width=it.w+'px';n.style.height=it.h+'px';const bar=n.querySelector('.cc-item-tools');if(bar){bar.style.left=it.x>500?'auto':'0';bar.style.right=it.x>500?'0':'auto';}const square=n.querySelector('.cc-matrix');if(square){const size=Math.max(50,Math.min(it.w-26,it.h-72));square.style.width=size+'px';square.style.height=size+'px';}}
- function drag(e,it,node,resizing){if(!editable()||e.button!==0||e.isPrimary===false)return;e.preventDefault();e.stopPropagation();pick(it.id);const before=clone(model),old=clone(it),length=history.undo.length;checkpoint();const ac=new AbortController(),sig=ac.signal,rect=stage.getBoundingClientRect(),sx=(e.clientX-rect.left)/scale,sy=(e.clientY-rect.top)/scale;let changed=false;
+
+ /* MULTI_SELECT_V1 */
+ const ccIds=new Set();let ccSkipClick=false;
+ const ccStyle=document.createElement('style');ccStyle.textContent='html body :is(#view,#view2Body) .rk-character-designer .cc-multi-selected{outline:1px solid currentColor;outline-offset:2px}html body :is(#view,#view2Body) .rk-character-designer .cc-marquee{position:absolute;pointer-events:none;z-index:9999;border:1px solid currentColor;background:color-mix(in srgb,currentColor 12%,transparent)}';root.appendChild(ccStyle);
+ function ccRefreshSelection(){
+  const live=new Set(model.items.map(it=>it.id));for(const id of ccIds)if(!live.has(id))ccIds.delete(id);
+  if(!editable()){ccIds.clear();selected='';}
+  stage.querySelectorAll('.cc-item').forEach(n=>{n.classList.toggle('cc-selected',editable()&&n.dataset.element===selected);n.classList.toggle('cc-multi-selected',editable()&&ccIds.has(n.dataset.element));});
+ }
+ function ccPick(id){if(!id){ccIds.clear();selected='';}else{if(!ccIds.has(id)){ccIds.clear();ccIds.add(id);}selected=id;}ccRefreshSelection();}
+ function ccPoint(e){const r=stage.getBoundingClientRect();return {x:(e.clientX-r.left)/scale,y:(e.clientY-r.top)/scale};}
+ function ccIntersects(it,box){return it.x<box.x+box.w&&it.x+it.w>box.x&&it.y<box.y+box.h&&it.y+it.h>box.y;}
+ function ccDelta(items,anchor,dx,dy,snap){
+  if(snap){dx=Math.round((anchor.x+dx)/20)*20-anchor.x;dy=Math.round((anchor.y+dy)/20)*20-anchor.y;}
+  return {x:Math.max(-Math.min(...items.map(x=>x.x)),Math.min(1000-Math.max(...items.map(x=>x.x+x.w)),dx)),y:Math.max(-Math.min(...items.map(x=>x.y)),Math.min(200000-Math.max(...items.map(x=>x.y)),dy))};
+ }
+ function ccScroll(place){
+  let last=null,raf=0;
+  function tick(){raf=0;if(!last)return;if(!editable()){cancelDrag?.();return;}const y=last.clientY,top=viewTop(),bottom=viewBottom();const delta=y>bottom-48?Math.min(24,(y-bottom+48)*.6):y<top+48?-Math.min(24,(top+48-y)*.6):0;if(!delta)return;if(scroller)scroller.scrollTop+=delta;else window.scrollBy(0,delta);place(last);raf=requestAnimationFrame(tick);}
+  return {move(e){last=e;place(e);if(!raf)raf=requestAnimationFrame(tick);},stop(){last=null;if(raf)cancelAnimationFrame(raf);raf=0;}};
+ }
+ function ccSuppressClick(){ccSkipClick=true;setTimeout(()=>{ccSkipClick=false;},0);}
+ function ccDragGroup(e,it){
+  if(!editable()||e.button!==0||e.isPrimary===false)return;
+  const originals=model.items.filter(x=>ccIds.has(x.id)).map(x=>({id:x.id,x:x.x,y:x.y,w:x.w,h:x.h}));if(originals.length<2)return;
+  e.preventDefault();e.stopPropagation();const before=clone(model),length=history.undo.length,start=ccPoint(e),anchor=originals.find(x=>x.id===it.id);checkpoint();
+  const ac=new AbortController();let changed=false;
+  function place(ev){const p=ccPoint(ev),d=ccDelta(originals,anchor,p.x-start.x,p.y-start.y,model.grid&&!ev.altKey);changed=changed||d.x!==0||d.y!==0;for(const old of originals){const item=model.items.find(x=>x.id===old.id);if(!item)continue;item.x=old.x+d.x;item.y=old.y+d.y;const node=[...stage.querySelectorAll('.cc-item')].find(n=>n.dataset.element===old.id);if(node)geometry(node,item);}fit();}
+  const scroll=ccScroll(place);
+  function clean(){scroll.stop();ac.abort();cancelDrag=null;}
+  function cancel(){clean();model=before;history.undo.splice(length);draw();ccRefreshSelection();}
+  function end(){if(!editable()){cancel();return;}clean();if(changed)commit(false);else{history.undo.splice(length);buttons();}ccSuppressClick();}
+  cancelDrag=cancel;
+  window.addEventListener('pointermove',ev=>{if(!editable()){cancel();return;}scroll.move(ev);},{signal:ac.signal});
+  window.addEventListener('pointerup',end,{once:true,signal:ac.signal});window.addEventListener('pointercancel',cancel,{once:true,signal:ac.signal});
+  window.addEventListener('keydown',ev=>{if(ev.key==='Escape'){ev.preventDefault();ev.stopImmediatePropagation();cancel();}},{capture:true,signal:ac.signal});signal.addEventListener('abort',cancel,{once:true,signal:ac.signal});
+ }
+ function ccMarquee(e){
+  e.preventDefault();e.stopImmediatePropagation();const start=ccPoint(e),old=new Set(ccIds),previous=selected,add=e.shiftKey||e.ctrlKey||e.metaKey,ac=new AbortController();
+  if(!add)ccPick('');const base=add?old:new Set();
+  const box=document.createElement('div');box.className='cc-marquee';box.hidden=true;stage.appendChild(box);
+  stage.focus({preventScroll:true});
+  function place(ev){const p=ccPoint(ev),r={x:Math.min(start.x,p.x),y:Math.min(start.y,p.y),w:Math.abs(start.x-p.x),h:Math.abs(start.y-p.y)};if(Math.hypot(r.w,r.h)*scale<3)return;box.hidden=false;Object.assign(box.style,{left:r.x+'px',top:r.y+'px',width:r.w+'px',height:r.h+'px'});ccIds.clear();for(const id of base)ccIds.add(id);for(const it of model.items)if(ccIntersects(it,r))ccIds.add(it.id);selected=[...ccIds].pop()||'';ccRefreshSelection();}
+  const scroll=ccScroll(place);
+  function clean(){scroll.stop();ac.abort();box.remove();cancelDrag=null;}
+  function cancel(){clean();ccIds.clear();for(const id of old)ccIds.add(id);selected=previous;ccRefreshSelection();}
+  function end(){clean();ccSuppressClick();}
+  cancelDrag=cancel;
+  window.addEventListener('pointermove',ev=>{if(!editable()){cancel();return;}scroll.move(ev);},{signal:ac.signal});window.addEventListener('pointerup',end,{once:true,signal:ac.signal});window.addEventListener('pointercancel',cancel,{once:true,signal:ac.signal});
+  window.addEventListener('keydown',ev=>{if(ev.key==='Escape'){ev.preventDefault();ev.stopImmediatePropagation();cancel();}},{capture:true,signal:ac.signal});signal.addEventListener('abort',cancel,{once:true,signal:ac.signal});
+ }
+ stage.tabIndex=0;
+ stage.addEventListener('pointerdown',e=>{
+  if(!editable()||e.button!==0||e.isPrimary===false||cancelDrag)return;
+  const target=e.target instanceof Element?e.target:null;if(!target)return;
+  if(target.closest('input,textarea,select,[contenteditable=true],.cc-item-tools,.cc-resize'))return;
+  const item=target.closest('.cc-item');
+  if(!item){if(target===stage)ccMarquee(e);return;}
+  const id=item.dataset.element;
+  if(e.shiftKey||e.ctrlKey||e.metaKey){e.preventDefault();e.stopImmediatePropagation();if(ccIds.has(id))ccIds.delete(id);else ccIds.add(id);selected=ccIds.has(id)?id:([...ccIds].pop()||'');ccRefreshSelection();ccSkipClick=true;window.addEventListener('pointerup',ccSuppressClick,{once:true,signal});}
+  else if(!ccIds.has(id)){ccIds.clear();ccIds.add(id);selected=id;ccRefreshSelection();}
+ },{capture:true,signal});
+ stage.addEventListener('click',e=>{if(ccSkipClick){ccSkipClick=false;e.preventDefault();e.stopImmediatePropagation();}},{capture:true,signal});
+ stage.addEventListener('keydown',e=>{if(e.key==='Escape'&&!cancelDrag&&!(e.target instanceof Element&&e.target.closest('input,textarea,[contenteditable=true]'))){ccPick('');}},{signal});
+ function ccMultiGeometry(n,it){
+  n.classList.toggle('cc-multi-selected',editable()&&ccIds.has(it.id));
+  const title=n.querySelector('.cc-title');if(title)title.style.setProperty('display',it.hideTitle||(!editable()&&!String(it.title||'').trim())?'none':'block','important');
+ }
+
+ function geometry(n,it){ccEnhanceBlock(n,it);ccMultiGeometry(n,it);queueMicrotask(()=>{if(n.isConnected){ccEnhanceBlock(n,it);ccMultiGeometry(n,it);}});n.style.left=it.x+'px';n.style.top=it.y+'px';n.style.width=it.w+'px';n.style.height=it.h+'px';const bar=n.querySelector('.cc-item-tools');if(bar){bar.style.left=it.x>500?'auto':'0';bar.style.right=it.x>500?'0':'auto';}const square=n.querySelector('.cc-matrix');if(square){const size=Math.max(50,Math.min(it.w-26,it.h-72));square.style.width=size+'px';square.style.height=size+'px';}}
+ function drag(e,it,node,resizing){if(!resizing&&ccIds.size>1&&ccIds.has(it.id)){ccDragGroup(e,it);return;}if(!editable()||e.button!==0||e.isPrimary===false)return;e.preventDefault();e.stopPropagation();pick(it.id);const before=clone(model),old=clone(it),length=history.undo.length;checkpoint();const ac=new AbortController(),sig=ac.signal,rect=stage.getBoundingClientRect(),sx=(e.clientX-rect.left)/scale,sy=(e.clientY-rect.top)/scale;let changed=false;
   const snap=(v,ev)=>model.grid&&!ev.altKey?Math.round(v/20)*20:v;
   let lastEv=null,raf=0;
   /* Автопрокрутка у нижнего и верхнего края, пока блок тянут */
