@@ -1,3 +1,4 @@
+import {readReadyObject} from './ready-files.mjs';
 const ID = /^[A-Za-z0-9_-]{1,128}$/;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -40,7 +41,7 @@ export default {
       if (!projectResponse.ok) return reply(503, 'Project authorization unavailable');
       const projects = await projectResponse.json();
       if (!Array.isArray(projects) || projects.length !== 1 || projects[0].id !== path[3]) return reply(404, 'Not found');
-      const object = await env.FILES.get('v1/' + user.id + '/' + path[3] + '/' + path[5]);
+      const object = await readReadyObject(env, user.id, path[3], path[5]);
       if (!object || !object.body) return reply(404, 'Not found');
       headers.set('Content-Type', 'application/octet-stream');
       headers.set('Content-Disposition', 'attachment');

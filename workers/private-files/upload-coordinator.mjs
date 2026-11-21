@@ -1,16 +1,21 @@
 import {DurableObject} from 'cloudflare:workers';
 import {createUploadService} from './upload-service.mjs';
+import {createMetadataReader} from './ready-files.mjs';
 
 // Not exported by the production Worker; no deployment configuration is added.
 // Future caller must use one fixed Durable Object ID for the whole quota domain.
 export class PrivateUploadCoordinator extends DurableObject {
   constructor(ctx, env) {
     super(ctx, env);
+    this.metadataReader = createMetadataReader(ctx.storage);
     this.service = env.UPLOADS_ENABLED === 'true' ? createUploadService(ctx.storage, env.FILES, {
       globalBytes: Number(env.GLOBAL_BYTES),
       userBytes: Number(env.USER_BYTES),
       fileBytes: Number(env.FILE_BYTES)
     }) : null;
+  }
+  async getReadyMetadata(owner, project, file) {
+    return this.metadataReader(owner, project, file);
   }
   async upload(record, body) {
     if (!this.service) throw new Error('Uploads disabled');
