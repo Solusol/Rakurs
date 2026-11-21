@@ -1,0 +1,14 @@
+# Isolated real-browser storage tests
+
+No application, Worker or production configuration is changed. The HTML harness only imports the two development storage modules; it does not write records on its own. No GitHub Actions workflow or automatic job is added.
+
+From a repository checkout, use a disposable Python environment with Playwright and its Chromium browser installed, then run: python scripts/test_private_storage_browser.py
+For example, install prerequisites explicitly with python -m pip install playwright and python -m playwright install chromium in that environment. Browser installation may download dependencies; the runner itself does not install software. Do not run Python with -O: the checks use assert. Dependency versions are not locked by this stage; record the Playwright and browser versions when reproducing results.
+
+The runner serves the checkout on an ephemeral 127.0.0.1 port, launches a fresh non-persistent Chromium context, blocks service workers and browser HTTP requests outside that origin, and opens two pages. It never attaches to a user's browser profile, signs in, opens the application or calls Cloudflare/Supabase. All project/account/file IDs are synthetic. IndexedDB writes are real but confined to the temporary browser context. Closing the context/browser discards that test profile. No database-delete or user-data cleanup command is used.
+
+Eight checks passed in the assistant execution environment with Chromium 134.0.6998.35: reading after another-page reload, account-key isolation, stale-revision rollback, two-page contention for one revision, attachment/legacy-field preservation and raw JSON round-trip, conflict during asynchronous metadata lookup, missing-ready-file refusal without a revision change, and local detachment preserving legacy content. These ran against the real local-projects.mjs and project-attachments.mjs implementations, not mocked IndexedDB or mocked save functions. Local adapter fixture matched Git blob e080d56d2eb69ab0ec0eefed087db12f9e6bbee6.
+
+The metadata callback is deliberately fake; real Auth, RPC, R2, quota cleanup and server-side revocation are NOT covered. Reloading a page is not browser-crash, operating-system-restart or storage-pressure durability testing. The raw JSON round-trip is NOT the application copy/import/export implementation. app.js, cloud.js and the UI are not loaded, so preservation through those save paths remains unverified. No claim of Firefox/WebKit compatibility or production readiness is made.
+
+The runner prints JSON results and returns a nonzero exit code on a failing check or setup failure. Give any automation an outer process timeout: unresolved browser promises may otherwise wait indefinitely. No automatic migration or production activation is authorized by these tests.

@@ -1,0 +1,10 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Private storage browser test harness</title>
+<h1>Private storage test harness</h1>
+<p>For the isolated localhost runner only. Importing this page does not write data.</p>
+<script type="module">
+import {readProject, saveProject} from '../../storage/local-projects.mjs';
+import {createAttachmentEditor} from '../../storage/project-attachments.mjs';
+window.privateStorageTest = Object.freeze({readProject, saveProject, createAttachmentEditor});
+</script>
