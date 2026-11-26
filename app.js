@@ -2362,7 +2362,10 @@ function rkContents(p,host,side){
  function populate(){
   menu.replaceChildren();const ordered=[],seen=new Set();
   const book=wsBook(p); ordered.push(book); wsChapters(book).forEach(ch=>{if(!seen.has(ch.id)){seen.add(ch.id);ordered.push(ch);}});
-  ordered.forEach(ch=>{const b=document.createElement('button');b.type='button';b.textContent=ch.title;b.dataset.chapter=ch.id;b.className=ch===book?'rk-contents-book':'rk-contents-chapter';if(ch.id===p.id)b.setAttribute('aria-current','page');b.onclick=()=>{menu.hidden=true;button.setAttribute('aria-expanded','false');if(side){prefs.split=ch.id;savePrefs();renderPane();}else nav('#/'+ch.id);};menu.appendChild(b);});
+  ordered.forEach(ch=>{const b=document.createElement('button');b.type='button';b.textContent=ch.title;b.dataset.chapter=ch.id;b.className=ch===book?'rk-contents-book':'rk-contents-chapter';if(ch.id===p.id)b.setAttribute('aria-current','page');b.onclick=()=>{menu.hidden=true;button.setAttribute('aria-expanded','false');if(side){prefs.split=ch.id;savePrefs();renderPane();}else nav('#/'+ch.id);};
+   /* Удаление отдельной главы: иконка справа от названия, только для своих глав и не в режиме чтения */
+   if(ch!==book&&!tabReadOnly&&wsUser(ch)){const row=document.createElement('div');row.className='rk-contents-row';const del=document.createElement('div');del.innerHTML=wsDelButton(ch);const db=del.firstChild;db.classList.add('rk-contents-del');db.addEventListener('click',()=>{menu.hidden=true;button.setAttribute('aria-expanded','false');},true);row.append(b,db);menu.appendChild(row);}
+   else menu.appendChild(b);});
   const add=document.createElement('button');add.type='button';add.className='rk-add-chapter';add.textContent='Добавить главу';add.onclick=()=>{menu.hidden=true;button.setAttribute('aria-expanded','false');rkAddChapter(wsBook(p).id);};menu.appendChild(add);
  }
  button.onclick=()=>{const opening=menu.hidden;if(opening)populate();menu.hidden=!opening;button.setAttribute('aria-expanded',String(opening));if(opening)menu.querySelector('button')?.focus();};
